@@ -9,12 +9,12 @@ python = "^3.12"
 
 # Define ACA-Py as an optional/extra dependancy so it can be
 # explicitly installed with the plugin if desired.
-acapy-agent-didx = { version = "1.2.0.post20250122", source = "testpypi" }
+acapy-agent-didx = { version = "1.2.0.post20250123", source = "testpypi" }
 aiohttp = "^3.9.10"
 fastapi-slim = "^0.115.2"
 nest-asyncio = "^1.5.5"
 pydantic = "^2.7"
-uvicorn = "^0.32.0"
+uvicorn = "^0.34.0"
 nats-py = {extras = ["nkeys"], version = "^2.9.0"}
 orjson = "~3.10.7"
 
