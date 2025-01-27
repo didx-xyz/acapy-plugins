@@ -9,7 +9,7 @@ python = "^3.12"
 
 # Define ACA-Py as an optional/extra dependancy so it can be
 # explicitly installed with the plugin if desired.
-acapy-agent-didx = { version = "1.2.0.post20250123", source = "testpypi" }
+acapy-agent-didx = { version = "1.2.0.post20250127", source = "testpypi" }
 aiohttp = "^3.9.10"
 fastapi-slim = "^0.115.2"
 nest-asyncio = "^1.5.5"
@@ -32,7 +32,7 @@ pre-commit = "^2.12.1"
 rope = "^1.13.0"
 
 [tool.poetry.group.integration.dependencies]
-aries-askar-ff137 = { version = "==0.3.3b0", source = "testpypi" }
+aries-askar = ">=0.4.2"
 indy-credx = { version = "~1.1.1" }
 indy-vdr = { version = "~0.4.1" }
 ursa-bbs-signatures = { version = "~1.0.1" }
