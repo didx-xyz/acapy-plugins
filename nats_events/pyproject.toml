@@ -32,7 +32,8 @@ pre-commit = "^2.12.1"
 rope = "^1.13.0"
 
 [tool.poetry.group.integration.dependencies]
-aries-askar = ">=0.4.2"
+# aries-askar = ">=0.4.2"
+aries-askar-ff137 = { version = "==0.4.3a0", source = "testpypi" }
 indy-credx = { version = "~1.1.1" }
 indy-vdr = { version = "~0.4.1" }
 ursa-bbs-signatures = { version = "~1.0.1" }
