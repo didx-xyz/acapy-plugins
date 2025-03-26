@@ -9,7 +9,8 @@ python = "^3.12"
 
 # Define ACA-Py as an optional/extra dependency so it can be
 # explicitly installed with the plugin if desired.
-acapy-agent = { version = "~1.2.4", optional = true }
+# acapy-agent = { version = "~1.2.4", optional = true }
+acapy-agent-didx = { version = "1.2.1.post20250324", source = "testpypi" }
 
 cryptography = "<38.0.0"
 
@@ -91,3 +92,7 @@ output = ".test-reports/coverage.xml"
 requires = ["setuptools", "poetry-core>=1.2"]
 build-backend = "poetry.core.masonry.api"
 
+[[tool.poetry.source]]
+name = "testpypi"
+url = "https://test.pypi.org/simple/"
+priority = "supplemental"
