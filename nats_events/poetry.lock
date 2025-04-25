@@ -1870,17 +1870,26 @@ description = "NATS client for Python"
 optional = false
 python-versions = ">=3.7"
 groups = ["main"]
-files = [
-    {file = "nats_py-2.10.0.tar.gz", hash = "sha256:9d44265a097edb30d40e214c1dd1a7405c1451d33480ce714c041fb73bb66a10"},
-]
+files = []
+develop = false
 
 [package.dependencies]
 nkeys = {version = "*", optional = true, markers = "extra == \"nkeys\""}
+orjson = {version = "*", optional = true, markers = "extra == \"orjson\""}
+uuid_utils = {version = "*", optional = true, markers = "extra == \"uuid-utils\""}
 
 [package.extras]
 aiohttp = ["aiohttp"]
 fast-parse = ["fast-mail-parser"]
 nkeys = ["nkeys"]
+orjson = ["orjson"]
+uuid-utils = ["uuid_utils"]
+
+[package.source]
+type = "git"
+url = "https://github.com/ff137/nats.py"
+reference = "feat-661-uuid"
+resolved_reference = "4ccea6506e8c4895ff808773a89d0282b79da9ce"
 
 [[package]]
 name = "nest-asyncio"
@@ -3298,4 +3307,4 @@ aca-py = []
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.12"
-content-hash = "0905a9794314c548625cbdae0848e771328f7d61b0abcd5dd66fbda6ed0e0b83"
+content-hash = "b2582ed726be2b86649c228b5f221c0a8153de98206de94183c1298069f82fbc"
