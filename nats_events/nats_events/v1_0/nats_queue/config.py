@@ -148,9 +148,7 @@ def process_config_dict(config_dict: dict) -> dict:
 def get_config(settings: Mapping[str, Any]) -> NATSConfig:
     """Retrieve producer configuration from settings."""
     try:
-        LOGGER.debug("Constructing config from: %s", settings.get("plugin_config"))
         config_dict = settings["plugin_config"].get("nats_queue", {})
-        LOGGER.debug("Retrieved: %s", config_dict)
         config_dict = process_config_dict(config_dict)
         config = NATSConfig(**config_dict)
     except KeyError:
