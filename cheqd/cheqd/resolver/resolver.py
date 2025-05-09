@@ -84,17 +84,22 @@ class CheqdDIDResolver(BaseDIDResolver):
                 self.DID_RESOLVER_BASE_URL + did,
                 headers=headers,
             ) as response:
+                response_text = await response.text()
                 if response.status == 200:
                     try:
                         resolver_resp = await response.json()
                         return resolver_resp
                     except Exception as err:
-                        raise ResolverError("Response was incorrectly formatted") from err
+                        raise ResolverError(
+                            f"Response was incorrectly formatted: {response_text}"
+                        ) from err
                 if response.status == 404:
                     raise DIDNotFound(f"No document found for {did}")
-            raise ResolverError(
-                "Could not find doc for {}: {}".format(did, await response.text())
-            )
+
+                raise ResolverError(
+                    f"Could not resolve DID {did}. "
+                    f"Status: {response.status}, Response: {response_text}"
+                )
 
     async def resolve(
         self,
