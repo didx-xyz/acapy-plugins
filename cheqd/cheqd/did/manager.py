@@ -62,7 +62,7 @@ class CheqdDIDManager(BaseDIDManager):
         self.resolver = CheqdDIDResolver(resolver_url)
 
     async def create(
-        self, did_doc: DIDDocumentSchema = None, options: dict = None
+        self, did_doc: DIDDocumentSchema | None = None, options: dict | None = None
     ) -> dict:
         """Create a new Cheqd DID."""
         options = options or {}
@@ -102,7 +102,9 @@ class CheqdDIDManager(BaseDIDManager):
                         [verification_method], [verification_keys]
                     )
                     did_document = create_did_payload(
-                        verification_methods, [verification_keys]
+                        verification_methods,
+                        [verification_keys],
+                        endpoint=self.profile.settings.get("default_endpoint"),
                     )
                 else:
                     did_document = did_doc
