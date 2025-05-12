@@ -37,6 +37,7 @@ class ServiceSchema(BaseModel):
     id: str
     type: str
     serviceEndpoint: Union[str, List[str]]
+    recipientKeys: Optional[List[str]] = None
 
 
 class DIDDocumentSchema(DynamicSchema):
