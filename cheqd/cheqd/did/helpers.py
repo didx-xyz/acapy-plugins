@@ -1,12 +1,15 @@
 """Helpers for did:cheqd."""
 
+import logging
 from enum import Enum
 from hashlib import sha256
 from typing import Dict, List, Union
 from uuid import uuid4
 
-from acapy_agent.wallet.util import b64_to_bytes, bytes_to_b58, bytes_to_b64
 from acapy_agent.utils.multiformats import multibase, multicodec
+from acapy_agent.wallet.util import b64_to_bytes, bytes_to_b58, bytes_to_b64
+
+logger = logging.getLogger(__name__)
 
 
 class CheqdNetwork(Enum):
@@ -155,16 +158,20 @@ def create_did_payload(
         raise ValueError("No verification keys provided")
 
     did = verification_keys[0]["didUrl"]
-    
+
     service = (
         {
             "id": f"{did}#service-1",
             "type": "did-communication",
-            "serviceEndpoint": [{"url": endpoint}],
+            "serviceEndpoint": [endpoint],
         }
         if endpoint
         else None
     )
+
+    if not service:
+        logger.info("No endpoint provided, did communication service not added")
+
     return {
         "id": did,
         "controller": [key["didUrl"] for key in verification_keys],
