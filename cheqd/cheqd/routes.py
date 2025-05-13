@@ -11,11 +11,7 @@ from aiohttp_apispec import docs, request_schema, response_schema
 from marshmallow import Schema, fields
 
 from .did.manager import CheqdDIDManager, CheqdDIDManagerError
-from .validation import (
-    CHEQD_DID_EXAMPLE,
-    CHEQD_DID_VALIDATE,
-    CHEQD_DIDSTATE_EXAMPLE,
-)
+from .validation import CHEQD_DID_EXAMPLE, CHEQD_DID_VALIDATE, CHEQD_DIDSTATE_EXAMPLE
 
 
 class VerificationMethodSchema(Schema):

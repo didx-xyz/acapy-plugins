@@ -13,29 +13,29 @@ from acapy_agent.wallet.key_type import ED25519
 from acapy_agent.wallet.util import b58_to_bytes, bytes_to_b64
 from aiohttp import web
 
-from .base import (
-    DidUpdateRequestOptions,
-    SubmitSignatureOptions,
-    DIDDocumentSchema,
-    DidActionState,
-)
-from .helpers import (
-    create_verification_keys,
-    create_did_verification_method,
-    VerificationMethods,
-    create_did_payload,
-    CheqdNetwork,
-)
 from ..did.base import (
     BaseDIDManager,
     CheqdDIDManagerError,
-    Secret,
-    DidDeactivateRequestOptions,
     DidCreateRequestOptions,
+    DidDeactivateRequestOptions,
     Options,
+    Secret,
 )
 from ..did_method import CHEQD
 from ..resolver.resolver import CheqdDIDResolver
+from .base import (
+    DidActionState,
+    DIDDocumentSchema,
+    DidUpdateRequestOptions,
+    SubmitSignatureOptions,
+)
+from .helpers import (
+    CheqdNetwork,
+    VerificationMethods,
+    create_did_payload,
+    create_did_verification_method,
+    create_verification_keys,
+)
 from .registrar import DIDRegistrar
 
 LOGGER = logging.getLogger(__name__)

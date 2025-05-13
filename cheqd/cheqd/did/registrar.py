@@ -1,20 +1,21 @@
 """DID Registrar for Cheqd."""
 
 import logging
+
 from aiohttp import ClientSession
 from pydantic import ValidationError
 
 from ..did.base import (
-    DidResponse,
     BaseDIDRegistrar,
     DidCreateRequestOptions,
     DidDeactivateRequestOptions,
+    DIDRegistrarError,
+    DidResponse,
     DidUpdateRequestOptions,
     ResourceCreateRequestOptions,
+    ResourceResponse,
     ResourceUpdateRequestOptions,
     SubmitSignatureOptions,
-    ResourceResponse,
-    DIDRegistrarError,
 )
 
 LOGGER = logging.getLogger(__name__)
