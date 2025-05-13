@@ -24,7 +24,9 @@ async def test_create(
         assert isinstance(did_state, DidSuccessState)
 
         request = mocked.requests[("POST", URL(create_url))][0]
-        assert request.kwargs["json"] == mock_did_create_options.dict(exclude_none=True)
+        assert request.kwargs["json"] == mock_did_create_options.model_dump(
+            exclude_none=True
+        )
 
 
 @pytest.mark.asyncio
@@ -74,7 +76,9 @@ async def test_update(
         assert isinstance(did_state, DidSuccessState)
 
         request = mocked.requests[("POST", URL(update_url))][0]
-        assert request.kwargs["json"] == mock_did_update_options.dict(exclude_none=True)
+        assert request.kwargs["json"] == mock_did_update_options.model_dump(
+            exclude_none=True
+        )
 
 
 @pytest.mark.asyncio
@@ -124,7 +128,7 @@ async def test_deactivate(
         assert isinstance(did_state, DidSuccessState)
 
         request = mocked.requests[("POST", URL(deactivate_url))][0]
-        assert request.kwargs["json"] == mock_did_deactivate_options.dict(
+        assert request.kwargs["json"] == mock_did_deactivate_options.model_dump(
             exclude_none=True
         )
 
@@ -173,7 +177,7 @@ async def test_create_resource(
         assert response is not None
 
         request = mocked.requests[("POST", URL(create_resource_url))][0]
-        assert request.kwargs["json"] == mock_resource_create_options.dict(
+        assert request.kwargs["json"] == mock_resource_create_options.model_dump(
             exclude_none=True
         )
 
@@ -213,7 +217,7 @@ async def test_update_resource(
         assert response is not None
 
         request = mocked.requests[("POST", URL(update_resource_url))][0]
-        assert request.kwargs["json"] == mock_resource_update_options.dict(
+        assert request.kwargs["json"] == mock_resource_update_options.model_dump(
             exclude_none=True
         )
 

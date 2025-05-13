@@ -161,7 +161,7 @@ class CheqdDIDManager(BaseDIDManager):
         return {
             "did": did,
             "verkey": verkey,
-            "didDocument": publish_did_state.didDocument.dict(),
+            "didDocument": publish_did_state.didDocument.model_dump(),
         }
 
     async def update(self, did: str, did_doc: dict, options: dict = None) -> dict:
@@ -220,7 +220,7 @@ class CheqdDIDManager(BaseDIDManager):
             except Exception as ex:
                 raise ex
 
-        return {"did": did, "didDocument": publish_did_state.didDocument.dict()}
+        return {"did": did, "didDocument": publish_did_state.didDocument.model_dump()}
 
     async def deactivate(self, did: str, options: dict = None) -> dict:
         """Deactivate a Cheqd DID."""
@@ -279,6 +279,6 @@ class CheqdDIDManager(BaseDIDManager):
                 raise ex
         return {
             "did": did,
-            "didDocument": publish_did_state.didDocument.dict(),
+            "didDocument": publish_did_state.didDocument.model_dump(),
             "didDocumentMetadata": metadata,
         }
