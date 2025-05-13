@@ -5,6 +5,7 @@ from http import HTTPStatus
 from acapy_agent.admin.decorators.auth import tenant_authentication
 from acapy_agent.admin.request_context import AdminRequestContext
 from acapy_agent.messaging.models.openapi import OpenAPISchema
+from acapy_agent.protocols.coordinate_mediation.v1_0.route_manager import RouteManager
 from acapy_agent.wallet.error import WalletError
 from aiohttp import web
 from aiohttp_apispec import docs, request_schema, response_schema
@@ -273,6 +274,7 @@ class UpdateCheqdDIDResponseSchema(OpenAPISchema):
 async def create_cheqd_did(request: web.BaseRequest):
     """Create a Cheqd DID."""
     context: AdminRequestContext = request["context"]
+    profile = context.profile
     config = context.settings.get("plugin_config")
     resolver_url = None
     registrar_url = None
@@ -285,12 +287,15 @@ async def create_cheqd_did(request: web.BaseRequest):
         body = {}
 
     try:
-        result = await CheqdDIDManager(
-            context.profile, registrar_url, resolver_url
-        ).create(body.get("didDocument"), body.get("options"))
-        return web.json_response(
-            {"did": result.get("did"), "verkey": result.get("verkey")}
+        result = await CheqdDIDManager(profile, registrar_url, resolver_url).create(
+            body.get("didDocument"), body.get("options")
         )
+
+        verkey = result.get("verkey")
+        route_manager = profile.inject(RouteManager)
+        await route_manager.route_verkey(profile, verkey)
+
+        return web.json_response({"did": result.get("did"), "verkey": verkey})
     except CheqdDIDManagerError as err:
         raise web.HTTPInternalServerError(reason=err.roll_up)
     except WalletError as err:
