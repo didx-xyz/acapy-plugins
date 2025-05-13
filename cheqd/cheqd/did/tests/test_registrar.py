@@ -2,7 +2,7 @@ import pytest
 from aioresponses import aioresponses
 from yarl import URL
 
-from cheqd.cheqd.did.base import DidResponse, DidSuccessState, DIDRegistrarError
+from cheqd.cheqd.did.base import DIDRegistrarError, DidResponse, DidSuccessState
 
 
 @pytest.mark.asyncio
