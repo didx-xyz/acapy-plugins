@@ -240,7 +240,7 @@ class DidUrlErrorState(DynamicSchema):
 class ResourceResponse(DynamicSchema):
     """Resource Create Response."""
 
-    jobId: str
+    jobId: str = ""
     didUrlState: Union[DidUrlSuccessState, DidUrlActionState, DidUrlErrorState]
     didRegistrationMetadata: dict = {}
     contentMetadata: dict = {}
@@ -249,7 +249,7 @@ class ResourceResponse(DynamicSchema):
 class UpdateResourceResponse(BaseModel):
     """Resource Update Response."""
 
-    jobId: str
+    jobId: str = ""
     didUrlState: Union[DidUrlSuccessState, DidUrlActionState, DidUrlErrorState]
     didRegistrationMetadata: dict = {}
     contentMetadata: dict = {}
