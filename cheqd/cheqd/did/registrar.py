@@ -142,7 +142,7 @@ class DIDRegistrar(BaseDIDRegistrar):
                         raise DIDRegistrarError(
                             "cheqd: did-registrar: create_resource: Response is None."
                         )
-
+                    LOGGER.debug("Create Resource Response: %s", res)
                     return ResourceResponse(**res)
             except (ValidationError, AttributeError):
                 raise DIDRegistrarError(
