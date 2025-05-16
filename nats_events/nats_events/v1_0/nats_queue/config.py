@@ -155,5 +155,4 @@ def get_config(settings: Mapping[str, Any]) -> NATSConfig:
         LOGGER.warning("Using default configuration")
         config = NATSConfig.default()
 
-    LOGGER.debug("Returning config: %s", config.model_dump_json(indent=2))
     return config

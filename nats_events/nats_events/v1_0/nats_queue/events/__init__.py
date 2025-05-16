@@ -276,7 +276,6 @@ async def handle_event(profile: Profile, event: EventWithMetadata):
         LOGGER.warning("JetStream context not available. Setting up JetStream again")
         js = await nats_jetstream_setup(profile, event)
 
-    LOGGER.debug("Handling event: %s", event)
     wallet_id: Optional[str] = profile.settings.get("wallet.id")
     try:
         event_payload = process_event_payload(event_payload_to_process)
