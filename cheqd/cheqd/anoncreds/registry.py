@@ -42,7 +42,7 @@ from acapy_agent.resolver.base import DIDNotFound
 from acapy_agent.wallet.base import BaseWallet
 from acapy_agent.wallet.error import WalletError
 from acapy_agent.wallet.jwt import dict_to_b64
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from ..did.base import (
     DidUrlActionState,
@@ -65,7 +65,7 @@ class PublishResourceResponse(BaseModel):
     """Publish Resource Response."""
 
     did_url: str
-    content: Union[dict, str]
+    content: Union[dict, str] = Field(..., repr=False)
 
 
 class DIDCheqdRegistry(BaseAnonCredsResolver, BaseAnonCredsRegistrar):
