@@ -37,10 +37,11 @@ class DIDRegistrar(BaseDIDRegistrar):
         self, options: DidCreateRequestOptions | SubmitSignatureOptions
     ) -> DidResponse:
         """Create a DID Document."""
+        LOGGER.debug("Creating DID document %s", options)
         async with ClientSession() as session:
             try:
                 async with session.post(
-                    self.DID_REGISTRAR_BASE_URL + "create" + f"?method={self.method}",
+                    f"{self.DID_REGISTRAR_BASE_URL}create?method={self.method}",
                     json=options.model_dump(exclude_none=True),
                 ) as response:
                     try:
@@ -66,10 +67,11 @@ class DIDRegistrar(BaseDIDRegistrar):
         self, options: DidUpdateRequestOptions | SubmitSignatureOptions
     ) -> DidResponse:
         """Update a DID Document."""
+        LOGGER.debug("Updating DID document %s", options)
         async with ClientSession() as session:
             try:
                 async with session.post(
-                    self.DID_REGISTRAR_BASE_URL + "update" + f"?method={self.method}",
+                    f"{self.DID_REGISTRAR_BASE_URL}update?method={self.method}",
                     json=options.model_dump(exclude_none=True),
                 ) as response:
                     try:
@@ -95,6 +97,7 @@ class DIDRegistrar(BaseDIDRegistrar):
         self, options: DidDeactivateRequestOptions | SubmitSignatureOptions
     ) -> DidResponse:
         """Deactivate a DID Document."""
+        LOGGER.debug("Deactivating DID %s", options)
         async with ClientSession() as session:
             try:
                 async with session.post(
@@ -124,12 +127,11 @@ class DIDRegistrar(BaseDIDRegistrar):
         self, options: ResourceCreateRequestOptions | SubmitSignatureOptions
     ) -> ResourceResponse:
         """Create a DID Linked Resource."""
+        LOGGER.debug("Creating resource %s", options)
         async with ClientSession() as session:
             try:
                 async with session.post(
-                    self.DID_REGISTRAR_BASE_URL
-                    + "createResource"
-                    + f"?method={self.method}",
+                    f"{self.DID_REGISTRAR_BASE_URL}createResource?method={self.method}",
                     json=options.model_dump(exclude_none=True),
                 ) as response:
                     try:
@@ -155,12 +157,11 @@ class DIDRegistrar(BaseDIDRegistrar):
         self, options: ResourceUpdateRequestOptions | SubmitSignatureOptions
     ) -> ResourceResponse:
         """Update a DID Linked Resource."""
+        LOGGER.debug("Updating resource %s", options)
         async with ClientSession() as session:
             try:
                 async with session.post(
-                    self.DID_REGISTRAR_BASE_URL
-                    + "updateResource"
-                    + f"?method={self.method}",
+                    f"{self.DID_REGISTRAR_BASE_URL}updateResource?method={self.method}",
                     json=options.model_dump(exclude_none=True),
                 ) as response:
                     try:
