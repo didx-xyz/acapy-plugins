@@ -76,7 +76,7 @@ class SigningRequest(DynamicSchema):
     kid: str
     type: Optional[str] = None
     alg: Optional[str] = None
-    serializedPayload: str
+    serializedPayload: str = Field(..., repr=False)
 
 
 class Secret(DynamicSchema):
@@ -148,6 +148,7 @@ class ResourceCreateRequestOptions(BaseModel):
     content: str = Field(
         None,
         description="This input field contains Base64-encoded data.",
+        repr=False,
     )
     options: Optional[Options] = None
 
@@ -167,6 +168,7 @@ class ResourceUpdateRequestOptions(BaseModel):
     content: List[str] = Field(
         None,
         description="This input field contains Base64-encoded data.",
+        repr=False,
     )
     options: Optional[Options] = None
 
