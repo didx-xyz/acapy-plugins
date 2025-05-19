@@ -1,5 +1,6 @@
 """DID Cheqd routes."""
 
+import logging
 from http import HTTPStatus
 
 from acapy_agent.admin.decorators.auth import tenant_authentication
@@ -14,6 +15,8 @@ from marshmallow import Schema, fields
 
 from .did.manager import CheqdDIDManager, CheqdDIDManagerError
 from .validation import CHEQD_DID_EXAMPLE, CHEQD_DID_VALIDATE, CHEQD_DIDSTATE_EXAMPLE
+
+LOGGER = logging.getLogger(__name__)
 
 
 class VerificationMethodSchema(Schema):
@@ -35,7 +38,10 @@ class VerificationMethodSchema(Schema):
     )
     publicKeyMultibase = fields.Str(
         required=False,
-        metadata={"description": "Public Key in multibase format", "example": "z6Mk..."},
+        metadata={
+            "description": "Public Key in multibase format",
+            "example": "z6Mk...",
+        },
     )
     publicKeyBase58 = fields.Str(
         required=False,
@@ -319,7 +325,8 @@ async def create_cheqd_did(request: web.BaseRequest):
         resolver_url = config.get("resolver_url")
     try:
         body = await request.json()
-    except Exception:
+    except Exception as err:
+        LOGGER.error("Error parsing request body: %s", str(err))
         body = {}
 
     try:
@@ -333,8 +340,10 @@ async def create_cheqd_did(request: web.BaseRequest):
 
         return web.json_response({"did": result.get("did"), "verkey": verkey})
     except CheqdDIDManagerError as err:
+        LOGGER.error("Error creating Cheqd DID: %s", err.roll_up)
         raise web.HTTPInternalServerError(reason=err.roll_up)
     except WalletError as err:
+        LOGGER.error("Error creating Cheqd DID: %s", err.roll_up)
         raise web.HTTPBadRequest(reason=err.roll_up)
 
 
@@ -353,7 +362,8 @@ async def update_cheqd_did(request: web.BaseRequest):
         resolver_url = config.get("resolver_url")
     try:
         body = await request.json()
-    except Exception:
+    except Exception as err:
+        LOGGER.error("Error parsing request body: %s", str(err))
         body = {}
 
     try:
@@ -366,8 +376,10 @@ async def update_cheqd_did(request: web.BaseRequest):
         )
         return web.json_response(result)
     except CheqdDIDManagerError as err:
+        LOGGER.error("Error updating Cheqd DID: %s", err.roll_up)
         raise web.HTTPInternalServerError(reason=err.roll_up)
     except WalletError as err:
+        LOGGER.error("Wallet error updating Cheqd DID: %s", err.roll_up)
         raise web.HTTPBadRequest(reason=err.roll_up)
 
 
@@ -386,7 +398,8 @@ async def deactivate_cheqd_did(request: web.BaseRequest):
         resolver_url = config.get("resolver_url")
     try:
         body = await request.json()
-    except Exception:
+    except Exception as err:
+        LOGGER.error("Error parsing request body: %s", str(err))
         body = {}
 
     try:
@@ -395,8 +408,10 @@ async def deactivate_cheqd_did(request: web.BaseRequest):
         ).deactivate(body.get("did"))
         return web.json_response(result)
     except CheqdDIDManagerError as err:
+        LOGGER.error("Error deactivating Cheqd DID: %s", err.roll_up)
         raise web.HTTPInternalServerError(reason=err.roll_up)
     except WalletError as err:
+        LOGGER.error("Wallet error deactivating Cheqd DID: %s", err.roll_up)
         raise web.HTTPBadRequest(reason=err.roll_up)
 
 

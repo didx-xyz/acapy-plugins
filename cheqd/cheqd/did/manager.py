@@ -69,6 +69,7 @@ class CheqdDIDManager(BaseDIDManager):
 
         seed = options.get("seed")
         if seed and not self.profile.settings.get("wallet.allow_insecure_seed"):
+            LOGGER.error("Insecure seed is not allowed")
             raise WalletError("Insecure seed is not allowed")
         if seed:
             seed = validate_seed(seed)
@@ -83,6 +84,7 @@ class CheqdDIDManager(BaseDIDManager):
             try:
                 wallet = session.inject(BaseWallet)
                 if not wallet:
+                    LOGGER.error("No wallet available")
                     raise WalletError(reason="No wallet available")
 
                 key = await wallet.create_key(key_type, seed)
@@ -122,6 +124,7 @@ class CheqdDIDManager(BaseDIDManager):
                 did_state = create_request_res.didState
                 if isinstance(did_state, DidActionState):
                     if not did_state.signingRequest:
+                        LOGGER.error("No signing requests available for create.")
                         raise CheqdDIDManagerError(
                             "No signing requests available for create."
                         )
@@ -150,10 +153,16 @@ class CheqdDIDManager(BaseDIDManager):
                     )
                     publish_did_state = publish_did_res.didState
                     if publish_did_state.state != "finished":
+                        LOGGER.error(
+                            "Unexpected published DID state: %s", publish_did_state
+                        )
                         raise CheqdDIDManagerError(
                             f"Error registering DID {publish_did_state.reason}"
                         )
                 else:
+                    LOGGER.error(
+                        "Unexpected DID state: %s, %s", type(did_state), did_state
+                    )
                     raise CheqdDIDManagerError(
                         f"Error registering DID {did_state.reason}"
                     )
@@ -162,6 +171,7 @@ class CheqdDIDManager(BaseDIDManager):
                 await wallet.create_public_did(CHEQD, key_type, seed, did)
                 await wallet.assign_kid_to_key(verkey, kid)
             except Exception as ex:
+                LOGGER.error("Exception occurred during DID creation: %s", str(ex))
                 raise ex
         return {
             "did": did,
@@ -176,11 +186,13 @@ class CheqdDIDManager(BaseDIDManager):
             try:
                 wallet = session.inject(BaseWallet)
                 if not wallet:
+                    LOGGER.error("No wallet available")
                     raise web.HTTPForbidden(reason="No wallet available")
 
                 # Resolve the DID and ensure it is not deactivated and is valid
                 curr_did_doc = await self.resolver.resolve(self.profile, did)
                 if not curr_did_doc or curr_did_doc.get("deactivated"):
+                    LOGGER.error("DID is already deactivated or not found: %s", did)
                     raise DIDNotFound("DID is already deactivated or not found.")
 
                 # request deactivate did
@@ -200,6 +212,7 @@ class CheqdDIDManager(BaseDIDManager):
                 if isinstance(did_state, DidActionState):
                     signing_requests = did_state.signingRequest
                     if not signing_requests:
+                        LOGGER.error("No signing requests available for update.")
                         raise Exception("No signing requests available for update.")
                     # sign all requests
                     signed_responses = await CheqdDIDManager.sign_requests(
@@ -215,14 +228,18 @@ class CheqdDIDManager(BaseDIDManager):
                     publish_did_state = publish_did_res.didState
 
                     if publish_did_state.state != "finished":
+                        LOGGER.error(
+                            "Error publishing DID update: %s", publish_did_state.reason
+                        )
                         raise CheqdDIDManagerError(
-                            f"Error publishing DID \
-                                update {publish_did_state.reason}"
+                            f"Error publishing DID update {publish_did_state.reason}"
                         )
                 else:
+                    LOGGER.error("Error updating DID: %s", did_state.reason)
                     raise CheqdDIDManagerError(f"Error updating DID {did_state.reason}")
             # TODO update new keys to wallet if necessary
             except Exception as ex:
+                LOGGER.error("Exception occurred during DID update: %s", str(ex))
                 raise ex
 
         return {"did": did, "didDocument": publish_did_state.didDocument.model_dump()}
@@ -235,10 +252,12 @@ class CheqdDIDManager(BaseDIDManager):
             try:
                 wallet = session.inject(BaseWallet)
                 if not wallet:
+                    LOGGER.error("No wallet available")
                     raise web.HTTPForbidden(reason="No wallet available")
                 # Resolve the DID and ensure it is not deactivated and is valid
                 did_doc = await self.resolver.resolve(self.profile, did)
                 if not did_doc or did_doc.get("deactivated"):
+                    LOGGER.error("DID is already deactivated or not found: %s", did)
                     raise DIDNotFound("DID is already deactivated or not found.")
 
                 # request deactivate did
@@ -252,6 +271,7 @@ class CheqdDIDManager(BaseDIDManager):
                 if isinstance(did_state, DidActionState):
                     signing_requests = did_state.signingRequest
                     if not signing_requests:
+                        LOGGER.error("No signing requests available for deactivate.")
                         raise WalletError("No signing requests available for update.")
                     # sign all requests
                     signed_responses = await CheqdDIDManager.sign_requests(
@@ -270,17 +290,23 @@ class CheqdDIDManager(BaseDIDManager):
                     publish_did_state = publish_did_res.didState
 
                     if publish_did_state.state != "finished":
+                        LOGGER.error(
+                            "Error publishing DID deactivate: %s",
+                            publish_did_state.reason,
+                        )
                         raise WalletError(
                             f"Error publishing DID \
                                 deactivate {publish_did_state.reason}"
                         )
                 else:
+                    LOGGER.error("Error deactivating DID: %s", did_state.reason)
                     raise WalletError(f"Error deactivating DID {did_state.reason}")
                 # update local did metadata
                 did_info = await wallet.get_local_did(did)
                 metadata = {**did_info.metadata, "deactivated": True}
                 await wallet.replace_local_did_metadata(did, metadata)
             except Exception as ex:
+                LOGGER.error("Exception occurred during DID deactivation: %s", str(ex))
                 raise ex
         return {
             "did": did,
