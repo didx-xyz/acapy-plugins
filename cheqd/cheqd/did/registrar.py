@@ -76,12 +76,15 @@ class DIDRegistrar(BaseDIDRegistrar):
                                 f"cheqd: did-registrar: {endpoint}: "
                                 "Account sequence mismatch after retries."
                             )
+                    else:
+                        LOGGER.info("Request should not be retried: %s", res)
                     return res
             except (ValidationError, AttributeError):
                 raise DIDRegistrarError(
                     f"cheqd: did-registrar: {endpoint}: Response Format is invalid"
                 )
-            except Exception:
+            except Exception as ex:
+                LOGGER.error("Error executing %s request: %s", endpoint, ex)
                 raise
 
     async def _parse_response(self, response, endpoint: str) -> dict:
