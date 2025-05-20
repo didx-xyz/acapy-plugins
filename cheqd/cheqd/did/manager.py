@@ -29,6 +29,8 @@ from ..resolver.resolver import CheqdDIDResolver
 from .base import (
     DidActionState,
     DIDDocumentSchema,
+    DidErrorState,
+    DidSuccessState,
     DidUpdateRequestOptions,
     SubmitSignatureOptions,
 )
@@ -153,19 +155,15 @@ class CheqdDIDManager(BaseDIDManager):
                     )
                     publish_did_state = publish_did_res.didState
                     if publish_did_state.state != "finished":
-                        LOGGER.error(
-                            "Unexpected published DID state: %s", publish_did_state
-                        )
-                        raise CheqdDIDManagerError(
-                            f"Error registering DID {publish_did_state.reason}"
-                        )
+                        LOGGER.error("Error publishing DID: %s", publish_did_state)
+                        message = self._get_error_message(publish_did_state)
+                        raise CheqdDIDManagerError(f"Error registering DID {message}")
                 else:
                     LOGGER.error(
                         "Unexpected DID state: %s, %s", type(did_state), did_state
                     )
-                    raise CheqdDIDManagerError(
-                        f"Error registering DID {did_state.reason}"
-                    )
+                    message = self._get_error_message(did_state)
+                    raise CheqdDIDManagerError(f"Error registering DID {message}")
 
                 # create public did record
                 await wallet.create_public_did(CHEQD, key_type, seed, did)
@@ -222,21 +220,22 @@ class CheqdDIDManager(BaseDIDManager):
                     # submit signed update
                     publish_did_res = await self.registrar.update(
                         SubmitSignatureOptions(
-                            jobId=job_id, secret=Secret(signingResponse=signed_responses)
+                            jobId=job_id,
+                            secret=Secret(signingResponse=signed_responses),
                         )
                     )
                     publish_did_state = publish_did_res.didState
 
                     if publish_did_state.state != "finished":
-                        LOGGER.error(
-                            "Error publishing DID update: %s", publish_did_state.reason
-                        )
+                        LOGGER.error("Error publishing DID update: %s", publish_did_state)
+                        message = self._get_error_message(publish_did_state)
                         raise CheqdDIDManagerError(
-                            f"Error publishing DID update {publish_did_state.reason}"
+                            f"Error publishing DID update {message}"
                         )
                 else:
-                    LOGGER.error("Error updating DID: %s", did_state.reason)
-                    raise CheqdDIDManagerError(f"Error updating DID {did_state.reason}")
+                    LOGGER.error("Error updating DID: %s", did_state)
+                    message = self._get_error_message(did_state)
+                    raise CheqdDIDManagerError(f"Error updating DID {message}")
             # TODO update new keys to wallet if necessary
             except Exception as ex:
                 LOGGER.error("Exception occurred during DID update: %s", str(ex))
@@ -291,16 +290,16 @@ class CheqdDIDManager(BaseDIDManager):
 
                     if publish_did_state.state != "finished":
                         LOGGER.error(
-                            "Error publishing DID deactivate: %s",
-                            publish_did_state.reason,
+                            "Error publishing DID deactivate: %s", publish_did_state
                         )
-                        raise WalletError(
-                            f"Error publishing DID \
-                                deactivate {publish_did_state.reason}"
+                        message = self._get_error_message(publish_did_state)
+                        raise CheqdDIDManagerError(
+                            f"Error publishing DID deactivate {message}"
                         )
                 else:
-                    LOGGER.error("Error deactivating DID: %s", did_state.reason)
-                    raise WalletError(f"Error deactivating DID {did_state.reason}")
+                    LOGGER.error("Error deactivating DID: %s", did_state)
+                    message = self._get_error_message(did_state)
+                    raise CheqdDIDManagerError(f"Error deactivating DID {message}")
                 # update local did metadata
                 did_info = await wallet.get_local_did(did)
                 metadata = {**did_info.metadata, "deactivated": True}
@@ -384,3 +383,12 @@ class CheqdDIDManager(BaseDIDManager):
                 raise ex
 
         return {"result": format_did_info(stored_info)}
+
+    def _get_error_message(
+        self, did_state: DidSuccessState | DidActionState | DidErrorState
+    ) -> str:
+        return (
+            did_state.description
+            if hasattr(did_state, "description") and did_state.description
+            else did_state.reason
+        )
