@@ -663,7 +663,7 @@ class DIDCheqdRegistry(BaseAnonCredsResolver, BaseAnonCredsRegistrar):
                         LOGGER.error("Error publishing Resource %s", resource_state)
                         message = _get_error_message(resource_state)
                         raise AnonCredsRegistrationError(
-                            f"Error publishing Resource {message}"
+                            f"Error publishing Resource: {message}"
                         )
                     result = PublishResourceResponse(
                         content=resource_state.content,
@@ -675,7 +675,7 @@ class DIDCheqdRegistry(BaseAnonCredsResolver, BaseAnonCredsRegistrar):
                     LOGGER.error("Error publishing Resource %s", resource_state)
                     message = _get_error_message(resource_state)
                     raise AnonCredsRegistrationError(
-                        f"Error publishing Resource {message}"
+                        f"Error publishing Resource: {message}"
                     )
             except Exception as err:
                 raise AnonCredsRegistrationError(f"{err}")
@@ -729,7 +729,7 @@ class DIDCheqdRegistry(BaseAnonCredsResolver, BaseAnonCredsRegistrar):
                         LOGGER.error("Error publishing Resource %s", resource_state)
                         message = _get_error_message(resource_state)
                         raise AnonCredsRegistrationError(
-                            f"Error publishing Resource {message}"
+                            f"Error publishing Resource: {message}"
                         )
                     result = PublishResourceResponse(
                         content=resource_state.content,
@@ -741,7 +741,7 @@ class DIDCheqdRegistry(BaseAnonCredsResolver, BaseAnonCredsRegistrar):
                     LOGGER.error("Error publishing Resource %s", resource_state)
                     message = _get_error_message(resource_state)
                     raise AnonCredsRegistrationError(
-                        f"Error publishing Resource {message}"
+                        f"Error publishing Resource: {message}"
                     )
             except Exception as err:
                 raise AnonCredsRegistrationError(f"{err}")
