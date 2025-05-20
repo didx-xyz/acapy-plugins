@@ -2,7 +2,6 @@
 
 import logging
 import asyncio
-from asyncio import Lock
 from time import time
 
 from aiohttp import ClientSession
@@ -35,7 +34,7 @@ class DIDRegistrar(BaseDIDRegistrar):
         if registrar_url:
             self.DID_REGISTRAR_BASE_URL = registrar_url
         self.method = method
-        self._lock = Lock()
+        self._lock = asyncio.Lock()
         self._pending_jobs: dict[str, float] = {}
         self._timeout = 1  # max seconds to wait for SubmitSignatureOptions after initial
 
@@ -43,16 +42,19 @@ class DIDRegistrar(BaseDIDRegistrar):
         """Execute a request to the DID Registrar."""
         if not isinstance(options, SubmitSignatureOptions):
             # Process initial request and block other requests until follow-up SubmitSignatureOptions is received.
-            response = await self._process_initial_request(endpoint, options)
-            job_id = response.get("jobId")
-            if job_id:
-                self._pending_jobs[job_id] = time()
-            else:
-                LOGGER.warning(
-                    "No jobId returned from initial %s request. Response: %s",
-                    endpoint,
-                    response,
-                )
+            async with self._lock, ClientSession() as session:
+                LOGGER.debug("Lock acquired for %s request", endpoint)
+                response = await self._process_initial_request(session, endpoint, options)
+                job_id = response.get("jobId")
+                if job_id:
+                    LOGGER.debug("Adding jobId to pending jobs: %s", job_id)
+                    self._pending_jobs[job_id] = time()
+                else:
+                    LOGGER.warning(
+                        "No jobId returned from initial %s request. Response: %s",
+                        endpoint,
+                        response,
+                    )
 
         else:
             LOGGER.debug("Submitting SignatureOptions for %s request", endpoint)
@@ -64,33 +66,33 @@ class DIDRegistrar(BaseDIDRegistrar):
 
         return response
 
-    async def _process_initial_request(self, endpoint: str, options: BaseModel) -> dict:
+    async def _process_initial_request(
+        self, session: ClientSession, endpoint: str, options: BaseModel
+    ) -> dict:
         """Process the initial request and block other requests until SubmitSignatureOptions is received."""
-        async with self._lock:
-            LOGGER.debug("Lock acquired for %s request", endpoint)
-            while self._pending_jobs:
-                current_time = time()
-                for job_id, start_time in list(self._pending_jobs.items()):
-                    if current_time - start_time > self._timeout:
-                        LOGGER.info(
-                            "Timeout waiting for %s other pending jobs to complete first...",
-                            job_id,
-                        )
-                        del self._pending_jobs[job_id]
-                if self._pending_jobs:
-                    LOGGER.debug("Waiting for other pending jobs to complete first...")
-                    await asyncio.sleep(self._timeout / 5)
+        while self._pending_jobs:
+            current_time = time()
+            for job_id, start_time in list(self._pending_jobs.items()):
+                if current_time - start_time > self._timeout:
+                    LOGGER.info(
+                        "Timeout waiting for %s other pending jobs to complete first...",
+                        job_id,
+                    )
+                    del self._pending_jobs[job_id]
+                else:
+                    LOGGER.debug("Waiting for %s job id to complete first...", job_id)
+            if self._pending_jobs:
+                LOGGER.debug("Waiting for other pending jobs to complete first...")
+                await asyncio.sleep(self._timeout / 5)
 
-            async with ClientSession() as session:
-                response = await self._submit_request(session, endpoint, options)
-
-        return response
+        return await self._submit_request(session, endpoint, options)
 
     async def _submit_request(
         self, session: ClientSession, endpoint: str, options: BaseModel
     ) -> dict:
         """Execute a request."""
         try:
+            LOGGER.debug("Submitting %s request", endpoint)
             async with session.post(
                 f"{self.DID_REGISTRAR_BASE_URL}{endpoint}?method={self.method}",
                 json=options.model_dump(exclude_none=True),
@@ -107,6 +109,7 @@ class DIDRegistrar(BaseDIDRegistrar):
 
     async def _parse_response(self, response, endpoint: str) -> dict:
         """Parse the response from the DID Registrar."""
+        LOGGER.debug("Parsing response from %s request", endpoint)
         try:
             res = await response.json()
         except Exception:
