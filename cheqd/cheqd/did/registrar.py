@@ -75,23 +75,47 @@ class DIDRegistrar(BaseDIDRegistrar):
         self._instance_id = instance_id or f"instance_{int(time() * 1000)}"
         self._lock_file_content: Optional[LockFileContent] = None
         self._last_transaction_time: Optional[float] = None
+        self._lock_file: Optional[int] = None
 
     async def _read_lock_file_content(self) -> Optional[LockFileContent]:
         """Read the current content of the lock file."""
         try:
             if os.path.exists(self.LOCK_FILE_PATH):
                 with open(self.LOCK_FILE_PATH, "r") as f:
-                    content = json.load(f)
-                    return LockFileContent(**content)
+                    try:
+                        content = json.load(f)
+                        return LockFileContent(**content)
+                    except json.JSONDecodeError as e:
+                        LOGGER.warning("Invalid JSON in lock file: %s", str(e))
+                        # Try to clean up the lock file
+                        try:
+                            os.remove(self.LOCK_FILE_PATH)
+                        except Exception as cleanup_error:
+                            LOGGER.error(
+                                "Failed to clean up invalid lock file: %s",
+                                str(cleanup_error),
+                            )
         except Exception as e:
             LOGGER.warning("Error reading lock file content: %s", str(e))
         return None
 
     async def _write_lock_file_content(self, content: LockFileContent) -> None:
         """Write content to the lock file."""
+        if self._lock_file is None:
+            LOGGER.error(
+                "Attempted to write to lock file without an open file descriptor"
+            )
+            return
+
         try:
             content_dict = content.model_dump()
             LOGGER.debug("Writing lock file content: %s", content_dict)
+
+            # Reset file position to start
+            os.lseek(self._lock_file, 0, os.SEEK_SET)
+            # Truncate the file
+            os.ftruncate(self._lock_file, 0)
+            # Write new content
             os.write(self._lock_file, json.dumps(content_dict).encode())
             os.fsync(self._lock_file)  # Ensure content is written to disk
         except Exception as e:
@@ -143,23 +167,37 @@ class DIDRegistrar(BaseDIDRegistrar):
 
                 retry_count += 1
                 if retry_count >= self._max_retries:
+                    LOGGER.info("Failed to acquire file lock after maximum retries")
                     raise DIDRegistrarError(
                         "Failed to acquire file lock after maximum retries"
                     )
+                LOGGER.debug("Waiting for %s seconds before retrying", self._retry_delay)
                 await asyncio.sleep(self._retry_delay)
 
-    def _release_file_lock(self) -> None:
+    async def _release_file_lock(self) -> None:
         """Release the file lock safely."""
         try:
-            if self._lock_file_content:
-                self._lock_file_content.current_job_id = None
-                self._lock_file_content.current_job_start = None
-                self._lock_file_content.current_job_endpoint = None
-                self._write_lock_file_content(self._lock_file_content)
+            if self._lock_file is not None:
+                if self._lock_file_content:
+                    self._lock_file_content.current_job_id = None
+                    self._lock_file_content.current_job_start = None
+                    self._lock_file_content.current_job_endpoint = None
+                    try:
+                        await self._write_lock_file_content(self._lock_file_content)
+                    except Exception as e:
+                        LOGGER.warning(
+                            "Failed to write final lock file content: %s", str(e)
+                        )
 
-            os.close(self._lock_file)
-            os.remove(self.LOCK_FILE_PATH)
-            LOGGER.debug("File lock released")
+                LOGGER.debug("Closing lock file")
+                os.close(self._lock_file)
+                self._lock_file = None
+                try:
+                    LOGGER.debug("Removing lock file")
+                    os.remove(self.LOCK_FILE_PATH)
+                except Exception as e:
+                    LOGGER.warning("Failed to remove lock file: %s", str(e))
+                LOGGER.debug("File lock released")
         except Exception as e:
             LOGGER.error("Error releasing file lock: %s", str(e))
             # Don't raise here to ensure cleanup continues
@@ -195,7 +233,7 @@ class DIDRegistrar(BaseDIDRegistrar):
                 return response
 
             finally:
-                self._release_file_lock()
+                await self._release_file_lock()
                 LOGGER.debug("Lock released for %s request", endpoint)
 
     async def _handle_signature_request(
