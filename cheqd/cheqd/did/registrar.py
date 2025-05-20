@@ -36,56 +36,74 @@ class DIDRegistrar(BaseDIDRegistrar):
             self.DID_REGISTRAR_BASE_URL = registrar_url
         self.method = method
         self._lock = Lock()
-        self._last_request_time = 0
+        self._pending_jobs: dict[str, float] = {}
+        self._timeout = 1  # max seconds to wait for SubmitSignatureOptions after initial
 
     async def _execute_request(self, endpoint: str, options: BaseModel) -> dict:
         """Execute a request to the DID Registrar."""
-        async with self._lock:  # Ensure that only one request is processed at a time
-            current_time = time()
-            time_since_last_request = current_time - self._last_request_time
-            if time_since_last_request < 1:
-                LOGGER.debug(
-                    "Sleeping for %s seconds before next Cheqd DID Registrar request",
-                    1 - time_since_last_request,
+        if not isinstance(options, SubmitSignatureOptions):
+            # Process initial request and block other requests until follow-up SubmitSignatureOptions is received.
+            response = await self._process_initial_request(endpoint, options)
+            job_id = response.get("jobId")
+            if job_id:
+                self._pending_jobs[job_id] = time()
+            else:
+                LOGGER.warning(
+                    "No jobId returned from initial %s request. Response: %s",
+                    endpoint,
+                    response,
                 )
-                await asyncio.sleep(1 - time_since_last_request)
-            self._last_request_time = time()
+
+        else:
+            LOGGER.debug("Submitting SignatureOptions for %s request", endpoint)
+            async with ClientSession() as session:
+                response = await self._submit_request(session, endpoint, options)
+            job_id = options.jobId
+            if job_id in self._pending_jobs:
+                del self._pending_jobs[job_id]
+
+        return response
+
+    async def _process_initial_request(self, endpoint: str, options: BaseModel) -> dict:
+        """Process the initial request and block other requests until SubmitSignatureOptions is received."""
+        async with self._lock:
+            LOGGER.debug("Lock acquired for %s request", endpoint)
+            while self._pending_jobs:
+                current_time = time()
+                for job_id, start_time in list(self._pending_jobs.items()):
+                    if current_time - start_time > self._timeout:
+                        LOGGER.info(
+                            "Timeout waiting for %s other pending jobs to complete first...",
+                            job_id,
+                        )
+                        del self._pending_jobs[job_id]
+                if self._pending_jobs:
+                    LOGGER.debug("Waiting for other pending jobs to complete first...")
+                    await asyncio.sleep(self._timeout / 5)
 
             async with ClientSession() as session:
-                return await self._retry_request(session, endpoint, options)
+                response = await self._submit_request(session, endpoint, options)
 
-    async def _retry_request(
-        self, session: ClientSession, endpoint: str, options: BaseModel, retries: int = 2
+        return response
+
+    async def _submit_request(
+        self, session: ClientSession, endpoint: str, options: BaseModel
     ) -> dict:
-        """Retry logic for executing a request."""
-        while retries >= 0:
-            try:
-                async with session.post(
-                    f"{self.DID_REGISTRAR_BASE_URL}{endpoint}?method={self.method}",
-                    json=options.model_dump(exclude_none=True),
-                ) as response:
-                    res = await self._parse_response(response, endpoint)
-                    if self._should_retry(res):
-                        if retries > 0:
-                            LOGGER.info("Account sequence mismatch, retrying...")
-                            await asyncio.sleep(1)
-                            retries -= 1
-                            continue
-                        else:
-                            raise DIDRegistrarError(
-                                f"cheqd: did-registrar: {endpoint}: "
-                                "Account sequence mismatch after retries."
-                            )
-                    else:
-                        LOGGER.info("Request should not be retried: %s", res)
-                    return res
-            except (ValidationError, AttributeError):
-                raise DIDRegistrarError(
-                    f"cheqd: did-registrar: {endpoint}: Response Format is invalid"
-                )
-            except Exception as ex:
-                LOGGER.error("Error executing %s request: %s", endpoint, ex)
-                raise
+        """Execute a request."""
+        try:
+            async with session.post(
+                f"{self.DID_REGISTRAR_BASE_URL}{endpoint}?method={self.method}",
+                json=options.model_dump(exclude_none=True),
+            ) as response:
+                res = await self._parse_response(response, endpoint)
+                return res
+        except (ValidationError, AttributeError):
+            raise DIDRegistrarError(
+                f"cheqd: did-registrar: {endpoint}: Response Format is invalid"
+            )
+        except Exception as ex:
+            LOGGER.error("Error executing %s request: %s", endpoint, ex)
+            raise
 
     async def _parse_response(self, response, endpoint: str) -> dict:
         """Parse the response from the DID Registrar."""
@@ -100,10 +118,6 @@ class DIDRegistrar(BaseDIDRegistrar):
                 f"cheqd: did-registrar: {endpoint}: Response is None."
             )
         return res
-
-    def _should_retry(self, res: dict) -> bool:
-        """Determine if the request should be retried based on the response."""
-        return "description" in res and "account sequence mismatch" in res["description"]
 
     async def create(
         self, options: DidCreateRequestOptions | SubmitSignatureOptions
