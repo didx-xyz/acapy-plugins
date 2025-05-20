@@ -44,6 +44,7 @@ class DIDRegistrar(BaseDIDRegistrar):
             # Process initial request and block other requests until follow-up SubmitSignatureOptions is received.
             async with self._lock, ClientSession() as session:
                 LOGGER.debug("Lock acquired for %s request", endpoint)
+                await asyncio.sleep(1)
                 response = await self._process_initial_request(session, endpoint, options)
                 job_id = response.get("jobId")
                 if job_id:
@@ -62,7 +63,10 @@ class DIDRegistrar(BaseDIDRegistrar):
                 response = await self._submit_request(session, endpoint, options)
             job_id = options.jobId
             if job_id in self._pending_jobs:
+                LOGGER.debug("Removing jobId from pending jobs: %s", job_id)
                 del self._pending_jobs[job_id]
+            else:
+                LOGGER.warning("JobId done but not found in pending jobs: %s", job_id)
 
         return response
 
