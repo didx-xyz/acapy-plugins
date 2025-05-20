@@ -46,6 +46,8 @@ from pydantic import BaseModel, Field
 
 from ..did.base import (
     DidUrlActionState,
+    DidUrlErrorState,
+    DidUrlSuccessState,
     Options,
     ResourceCreateRequestOptions,
     ResourceUpdateRequestOptions,
@@ -658,8 +660,10 @@ class DIDCheqdRegistry(BaseAnonCredsResolver, BaseAnonCredsRegistrar):
                     resource_state = publish_resource_res.didUrlState
                     LOGGER.debug("Resource state %s", resource_state)
                     if resource_state.state != "finished":
+                        LOGGER.error("Error publishing Resource %s", resource_state)
+                        message = _get_error_message(resource_state)
                         raise AnonCredsRegistrationError(
-                            f"Error publishing Resource {resource_state.reason}"
+                            f"Error publishing Resource {message}"
                         )
                     result = PublishResourceResponse(
                         content=resource_state.content,
@@ -668,8 +672,10 @@ class DIDCheqdRegistry(BaseAnonCredsResolver, BaseAnonCredsRegistrar):
                     LOGGER.debug("Published resource %s", result)
                     return result
                 else:
+                    LOGGER.error("Error publishing Resource %s", resource_state)
+                    message = _get_error_message(resource_state)
                     raise AnonCredsRegistrationError(
-                        f"Error publishing Resource {resource_state.reason}"
+                        f"Error publishing Resource {message}"
                     )
             except Exception as err:
                 raise AnonCredsRegistrationError(f"{err}")
@@ -720,8 +726,10 @@ class DIDCheqdRegistry(BaseAnonCredsResolver, BaseAnonCredsRegistrar):
                     resource_state = publish_resource_res.didUrlState
                     LOGGER.debug("Resource state %s", resource_state)
                     if resource_state.state != "finished":
+                        LOGGER.error("Error publishing Resource %s", resource_state)
+                        message = _get_error_message(resource_state)
                         raise AnonCredsRegistrationError(
-                            f"Error publishing Resource {resource_state.reason}"
+                            f"Error publishing Resource {message}"
                         )
                     result = PublishResourceResponse(
                         content=resource_state.content,
@@ -730,8 +738,20 @@ class DIDCheqdRegistry(BaseAnonCredsResolver, BaseAnonCredsRegistrar):
                     LOGGER.debug("Published resource %s", result)
                     return result
                 else:
+                    LOGGER.error("Error publishing Resource %s", resource_state)
+                    message = _get_error_message(resource_state)
                     raise AnonCredsRegistrationError(
-                        f"Error publishing Resource {resource_state.reason}"
+                        f"Error publishing Resource {message}"
                     )
             except Exception as err:
                 raise AnonCredsRegistrationError(f"{err}")
+
+
+def _get_error_message(
+    resource_state: DidUrlSuccessState | DidUrlActionState | DidUrlErrorState,
+) -> str:
+    return (
+        resource_state.description
+        if hasattr(resource_state, "description") and resource_state.description
+        else resource_state.reason
+    )
