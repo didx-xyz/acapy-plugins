@@ -4,7 +4,7 @@ import logging
 import asyncio
 from time import time
 
-from aiohttp import ClientSession
+from aiohttp import ClientResponse, ClientSession
 from pydantic import BaseModel, ValidationError
 
 from ..did.base import (
@@ -93,12 +93,11 @@ class DIDRegistrar(BaseDIDRegistrar):
         """Execute a request."""
         try:
             LOGGER.debug("Submitting %s request", endpoint)
-            async with session.post(
+            response = await session.post(
                 f"{self.DID_REGISTRAR_BASE_URL}{endpoint}?method={self.method}",
                 json=options.model_dump(exclude_none=True),
-            ) as response:
-                res = await self._parse_response(response, endpoint)
-                return res
+            )
+            return await self._parse_response(response, endpoint)
         except (ValidationError, AttributeError):
             raise DIDRegistrarError(
                 f"cheqd: did-registrar: {endpoint}: Response Format is invalid"
@@ -107,7 +106,7 @@ class DIDRegistrar(BaseDIDRegistrar):
             LOGGER.error("Error executing %s request: %s", endpoint, ex)
             raise
 
-    async def _parse_response(self, response, endpoint: str) -> dict:
+    async def _parse_response(self, response: ClientResponse, endpoint: str) -> dict:
         """Parse the response from the DID Registrar."""
         LOGGER.debug("Parsing response from %s request", endpoint)
         try:
@@ -116,6 +115,8 @@ class DIDRegistrar(BaseDIDRegistrar):
             raise DIDRegistrarError(
                 f"cheqd: did-registrar: {endpoint}: Unable to parse JSON"
             )
+        finally:
+            await response.release()
         if not res:
             raise DIDRegistrarError(
                 f"cheqd: did-registrar: {endpoint}: Response is None."
