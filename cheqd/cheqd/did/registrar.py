@@ -1,7 +1,8 @@
 """DID Registrar for Cheqd."""
 
-import logging
 import asyncio
+import logging
+import os
 from time import time
 
 from aiohttp import ClientResponse, ClientSession
@@ -27,6 +28,7 @@ class DIDRegistrar(BaseDIDRegistrar):
     """Universal DID Registrar implementation."""
 
     DID_REGISTRAR_BASE_URL = "http://localhost:9080/1.0/"
+    LOCK_FILE_PATH = "/tmp/did_registrar.lock"
 
     def __init__(self, method: str, registrar_url: str = None) -> None:
         """Initialize the Cheqd Registrar."""
@@ -34,16 +36,36 @@ class DIDRegistrar(BaseDIDRegistrar):
         if registrar_url:
             self.DID_REGISTRAR_BASE_URL = registrar_url
         self.method = method
-        self._lock = asyncio.Lock()
         self._pending_jobs: dict[str, float] = {}
         self._timeout = 1  # max seconds to wait for SubmitSignatureOptions after initial
+
+    async def _acquire_file_lock(self):
+        """Acquire a file lock."""
+        while True:
+            try:
+                # O_CREAT: create the file if it doesn't exist,
+                # O_EXCL: fail if the file already exists,
+                # O_RDWR: open for reading and writing
+                flags = os.O_CREAT | os.O_EXCL | os.O_RDWR
+                self._lock_file = os.open(self.LOCK_FILE_PATH, flags)
+                LOGGER.debug("File lock acquired")
+                break
+            except FileExistsError:
+                LOGGER.debug("Waiting for file lock to be released")
+                await asyncio.sleep(0.1)
+
+    def _release_file_lock(self):
+        """Release the file lock."""
+        os.close(self._lock_file)
+        os.remove(self.LOCK_FILE_PATH)
+        LOGGER.debug("File lock released")
 
     async def _execute_request(self, endpoint: str, options: BaseModel) -> dict:
         """Execute a request to the DID Registrar."""
         if not isinstance(options, SubmitSignatureOptions):
             # Process initial request and block other requests until follow-up SubmitSignatureOptions is received.
-            await self._lock.acquire()
             try:
+                await self._acquire_file_lock()
                 LOGGER.debug("Lock acquired for %s request", endpoint)
                 await asyncio.sleep(1)
                 response = await self._process_initial_request(endpoint, options)
@@ -58,12 +80,11 @@ class DIDRegistrar(BaseDIDRegistrar):
                         response,
                     )
             finally:
-                await self._lock.release()
+                self._release_file_lock()
                 LOGGER.debug("Lock released for %s request", endpoint)
         else:
             LOGGER.debug("Submitting SignatureOptions for %s request", endpoint)
-            async with ClientSession() as session:
-                response = await self._submit_request(session, endpoint, options)
+            response = await self._submit_request(endpoint, options)
             job_id = options.jobId
             if job_id in self._pending_jobs:
                 LOGGER.debug("Removing jobId from pending jobs: %s", job_id)
