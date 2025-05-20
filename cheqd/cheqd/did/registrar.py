@@ -122,7 +122,7 @@ class DIDRegistrar(BaseDIDRegistrar):
                     f"{self.DID_REGISTRAR_BASE_URL}{endpoint}?method={self.method}",
                     json=options.model_dump(exclude_none=True),
                 )
-            return await self._parse_response(response, endpoint)
+                return await self._parse_response(response, endpoint)
         except (ValidationError, AttributeError):
             raise DIDRegistrarError(
                 f"cheqd: did-registrar: {endpoint}: Response Format is invalid"
