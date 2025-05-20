@@ -240,29 +240,37 @@ class DIDRegistrar(BaseDIDRegistrar):
         self, endpoint: str, options: SubmitSignatureOptions
     ) -> dict:
         """Handle the signature request and update job tracking."""
-        LOGGER.debug("Submitting SignatureOptions for %s request", endpoint)
-        response = await self._submit_request(endpoint, options)
-        job_id = options.jobId
+        async with self._lock:
+            try:
+                await self._acquire_file_lock()
+                LOGGER.debug("Lock acquired for signature request")
 
-        if job_id in self._pending_jobs:
-            LOGGER.debug("Removing jobId from pending jobs: %s", job_id)
-            del self._pending_jobs[job_id]
-            self._last_transaction_time = time()
+                response = await self._submit_request(endpoint, options)
+                job_id = options.jobId
 
-            # Update lock file content if we have it
-            if self._lock_file_content:
-                self._lock_file_content.last_transaction_time = (
-                    self._last_transaction_time
-                )
-                if self._lock_file_content.current_job_id == job_id:
-                    self._lock_file_content.current_job_id = None
-                    self._lock_file_content.current_job_start = None
-                    self._lock_file_content.current_job_endpoint = None
-                await self._write_lock_file_content(self._lock_file_content)
-        else:
-            LOGGER.warning("JobId done but not found in pending jobs: %s", job_id)
+                if job_id in self._pending_jobs:
+                    LOGGER.debug("Removing jobId from pending jobs: %s", job_id)
+                    del self._pending_jobs[job_id]
+                    self._last_transaction_time = time()
 
-        return response
+                    # Update lock file content if we have it
+                    if self._lock_file_content:
+                        self._lock_file_content.last_transaction_time = (
+                            self._last_transaction_time
+                        )
+                        if self._lock_file_content.current_job_id == job_id:
+                            self._lock_file_content.current_job_id = None
+                            self._lock_file_content.current_job_start = None
+                            self._lock_file_content.current_job_endpoint = None
+                        await self._write_lock_file_content(self._lock_file_content)
+                else:
+                    LOGGER.warning("JobId done but not found in pending jobs: %s", job_id)
+
+                return response
+
+            finally:
+                await self._release_file_lock()
+                LOGGER.debug("Lock released for signature request")
 
     async def _execute_request(self, endpoint: str, options: BaseModel) -> dict:
         """Execute a request to the DID Registrar with improved sequence management."""
