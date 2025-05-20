@@ -42,10 +42,11 @@ class DIDRegistrar(BaseDIDRegistrar):
         """Execute a request to the DID Registrar."""
         if not isinstance(options, SubmitSignatureOptions):
             # Process initial request and block other requests until follow-up SubmitSignatureOptions is received.
-            async with self._lock, ClientSession() as session:
+            await self._lock.acquire()
+            try:
                 LOGGER.debug("Lock acquired for %s request", endpoint)
                 await asyncio.sleep(1)
-                response = await self._process_initial_request(session, endpoint, options)
+                response = await self._process_initial_request(endpoint, options)
                 job_id = response.get("jobId")
                 if job_id:
                     LOGGER.debug("Adding jobId to pending jobs: %s", job_id)
@@ -56,7 +57,9 @@ class DIDRegistrar(BaseDIDRegistrar):
                         endpoint,
                         response,
                     )
-
+            finally:
+                await self._lock.release()
+                LOGGER.debug("Lock released for %s request", endpoint)
         else:
             LOGGER.debug("Submitting SignatureOptions for %s request", endpoint)
             async with ClientSession() as session:
@@ -70,9 +73,7 @@ class DIDRegistrar(BaseDIDRegistrar):
 
         return response
 
-    async def _process_initial_request(
-        self, session: ClientSession, endpoint: str, options: BaseModel
-    ) -> dict:
+    async def _process_initial_request(self, endpoint: str, options: BaseModel) -> dict:
         """Process the initial request and block other requests until SubmitSignatureOptions is received."""
         while self._pending_jobs:
             current_time = time()
@@ -89,18 +90,17 @@ class DIDRegistrar(BaseDIDRegistrar):
                 LOGGER.debug("Waiting for other pending jobs to complete first...")
                 await asyncio.sleep(self._timeout / 5)
 
-        return await self._submit_request(session, endpoint, options)
+        return await self._submit_request(endpoint, options)
 
-    async def _submit_request(
-        self, session: ClientSession, endpoint: str, options: BaseModel
-    ) -> dict:
+    async def _submit_request(self, endpoint: str, options: BaseModel) -> dict:
         """Execute a request."""
         try:
-            LOGGER.debug("Submitting %s request", endpoint)
-            response = await session.post(
-                f"{self.DID_REGISTRAR_BASE_URL}{endpoint}?method={self.method}",
-                json=options.model_dump(exclude_none=True),
-            )
+            async with ClientSession() as session:
+                LOGGER.debug("Submitting %s request", endpoint)
+                response = await session.post(
+                    f"{self.DID_REGISTRAR_BASE_URL}{endpoint}?method={self.method}",
+                    json=options.model_dump(exclude_none=True),
+                )
             return await self._parse_response(response, endpoint)
         except (ValidationError, AttributeError):
             raise DIDRegistrarError(
