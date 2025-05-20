@@ -1,6 +1,8 @@
 """DID Manager for Cheqd."""
 
+import asyncio
 import logging
+from typing import Tuple
 
 from acapy_agent.core.profile import Profile
 from acapy_agent.resolver.base import DIDNotFound
@@ -63,16 +65,9 @@ class CheqdDIDManager(BaseDIDManager):
     async def create(
         self, did_doc: DIDDocumentSchema | None = None, options: dict | None = None
     ) -> dict:
-        """Create a new Cheqd DID."""
+        """Create a new Cheqd DID with retry logic for sequence mismatches."""
         options = options or {}
-
-        seed = options.get("seed")
-        if seed and not self.profile.settings.get("wallet.allow_insecure_seed"):
-            LOGGER.error("Insecure seed is not allowed")
-            raise WalletError("Insecure seed is not allowed")
-        if seed:
-            seed = validate_seed(seed)
-
+        seed = self._validate_seed(options)
         network = options.get("network") or CheqdNetwork.Testnet.value
         key_type = ED25519
 
@@ -80,97 +75,144 @@ class CheqdDIDManager(BaseDIDManager):
         did_validation.validate_key_type(CHEQD, key_type)
 
         async with self.profile.session() as session:
-            try:
-                wallet = session.inject(BaseWallet)
-                if not wallet:
-                    LOGGER.error("No wallet available")
-                    raise WalletError(reason="No wallet available")
+            wallet = session.inject(BaseWallet)
+            if not wallet:
+                LOGGER.error("No wallet available")
+                raise WalletError(reason="No wallet available")
 
-                key = await wallet.create_key(key_type, seed)
-                verkey = key.verkey
-                verkey_bytes = b58_to_bytes(verkey)
-                public_key_b64 = bytes_to_b64(verkey_bytes)
-                verification_method = (
-                    options.get("verification_method") or VerificationMethods.Ed255192020
-                )
+            retry_count = 0
+            max_retries = 3
+            retry_delay = 1.0
+            last_error = None
 
-                if did_doc is None:
-                    # generate payload
-                    verification_keys = create_verification_keys(public_key_b64, network)
-                    verification_methods = create_did_verification_method(
-                        [verification_method], [verification_keys]
+            while retry_count <= max_retries:
+                try:
+                    did_document, verkey, kid = await self._prepare_did_document(
+                        wallet, did_doc, options, network, key_type, seed
                     )
-                    did_document = create_did_payload(
-                        verification_methods,
-                        [verification_keys],
-                        endpoint=self.profile.settings.get("default_endpoint"),
+                    return await self._create_and_publish_did(
+                        wallet, did_document, network, verkey, kid
                     )
-                else:
-                    did_document = did_doc
-
-                did: str = did_document.get("id")
-
-                # request create did
-                create_request_res = await self.registrar.create(
-                    DidCreateRequestOptions(
-                        didDocument=did_document, options=Options(network=network)
-                    )
-                )
-
-                job_id = create_request_res.jobId
-                did_state = create_request_res.didState
-                if isinstance(did_state, DidActionState):
-                    if not did_state.signingRequest:
-                        LOGGER.error("No signing requests available for create.")
-                        raise CheqdDIDManagerError(
-                            "No signing requests available for create."
+                except CheqdDIDManagerError as e:
+                    last_error = e
+                    if not self._should_retry(e):
+                        raise
+                    retry_count += 1
+                    if retry_count <= max_retries:
+                        LOGGER.warning(
+                            "Account sequence mismatch detected, retrying (%d/%d)",
+                            retry_count,
+                            max_retries,
                         )
-
-                    signing_request = next(iter(did_state.signingRequest.values()), None)
-
-                    # Note: This assumes the DID create operation supports only one key
-                    kid = signing_request.kid
-                    await wallet.assign_kid_to_key(verkey, kid)
-
-                    # sign all requests
-                    signed_responses = await CheqdDIDManager.sign_requests(
-                        wallet, did_state.signingRequest
-                    )
-                    # publish did
-                    publish_did_res = await self.registrar.create(
-                        SubmitSignatureOptions(
-                            jobId=job_id,
-                            options=Options(
-                                network=network,
-                            ),
-                            secret=Secret(
-                                signingResponse=signed_responses,
-                            ),
+                        await asyncio.sleep(retry_delay)
+                    else:
+                        LOGGER.error(
+                            "Max retries exceeded for DID creation: %s", str(last_error)
                         )
-                    )
-                    publish_did_state = publish_did_res.didState
-                    if publish_did_state.state != "finished":
-                        LOGGER.error("Error publishing DID: %s", publish_did_state)
-                        message = self._get_error_message(publish_did_state)
-                        raise CheqdDIDManagerError(f"Error registering DID: {message}")
-                else:
-                    LOGGER.error(
-                        "Unexpected DID state: %s, %s", type(did_state), did_state
-                    )
-                    message = self._get_error_message(did_state)
-                    raise CheqdDIDManagerError(f"Error registering DID: {message}")
+                        raise
+                except Exception as ex:
+                    LOGGER.error("Unexpected error during DID creation: %s", str(ex))
+                    raise CheqdDIDManagerError(str(ex))
 
-                # create public did record
-                await wallet.create_public_did(CHEQD, key_type, seed, did)
-                await wallet.assign_kid_to_key(verkey, kid)
-            except Exception as ex:
-                LOGGER.error("Exception occurred during DID creation: %s", str(ex))
-                raise ex
-        return {
-            "did": did,
-            "verkey": verkey,
-            "didDocument": publish_did_state.didDocument.model_dump(),
-        }
+    def _validate_seed(self, options: dict) -> str:
+        """Validate and return the seed."""
+        seed = options.get("seed")
+        if seed and not self.profile.settings.get("wallet.allow_insecure_seed"):
+            LOGGER.error("Insecure seed is not allowed")
+            raise WalletError("Insecure seed is not allowed")
+        return validate_seed(seed) if seed else None
+
+    async def _prepare_did_document(
+        self,
+        wallet: BaseWallet,
+        did_doc: DIDDocumentSchema,
+        options: dict,
+        network: str,
+        key_type: str,
+        seed: str,
+    ) -> Tuple[DIDDocumentSchema, str, str]:
+        """Prepare the DID document and return it along with verkey and kid."""
+        key = await wallet.create_key(key_type, seed)
+        verkey = key.verkey
+        verkey_bytes = b58_to_bytes(verkey)
+        public_key_b64 = bytes_to_b64(verkey_bytes)
+        verification_method = (
+            options.get("verification_method") or VerificationMethods.Ed255192020
+        )
+
+        if did_doc is None:
+            verification_keys = create_verification_keys(public_key_b64, network)
+            verification_methods = create_did_verification_method(
+                [verification_method], [verification_keys]
+            )
+            did_document = create_did_payload(
+                verification_methods,
+                [verification_keys],
+                endpoint=self.profile.settings.get("default_endpoint"),
+            )
+        else:
+            did_document = did_doc
+
+        did = did_document.get("id")
+        return did_document, verkey, did
+
+    async def _create_and_publish_did(
+        self,
+        wallet: BaseWallet,
+        did_document: DIDDocumentSchema,
+        network: str,
+        verkey: str,
+        kid: str,
+    ) -> dict:
+        """Create and publish the DID."""
+        create_request_res = await self.registrar.create(
+            DidCreateRequestOptions(
+                didDocument=did_document, options=Options(network=network)
+            )
+        )
+
+        job_id = create_request_res.jobId
+        did_state = create_request_res.didState
+        if isinstance(did_state, DidActionState):
+            if not did_state.signingRequest:
+                LOGGER.error("No signing requests available for create.")
+                raise CheqdDIDManagerError("No signing requests available for create.")
+
+            signing_request = next(iter(did_state.signingRequest.values()), None)
+            kid = signing_request.kid
+            await wallet.assign_kid_to_key(verkey, kid)
+
+            signed_responses = await CheqdDIDManager.sign_requests(
+                wallet, did_state.signingRequest
+            )
+            publish_did_res = await self.registrar.create(
+                SubmitSignatureOptions(
+                    jobId=job_id,
+                    options=Options(network=network),
+                    secret=Secret(signingResponse=signed_responses),
+                )
+            )
+            publish_did_state = publish_did_res.didState
+            if publish_did_state.state != "finished":
+                LOGGER.error("Error publishing DID: %s", publish_did_state)
+                message = self._get_error_message(publish_did_state)
+                raise CheqdDIDManagerError(f"Error registering DID: {message}")
+
+            await wallet.create_public_did(CHEQD, ED25519, None, did_document["id"])
+            await wallet.assign_kid_to_key(verkey, kid)
+            return {
+                "did": did_document["id"],
+                "verkey": verkey,
+                "didDocument": publish_did_state.didDocument.model_dump(),
+            }
+        else:
+            LOGGER.error("Unexpected DID state: %s, %s", type(did_state), did_state)
+            message = self._get_error_message(did_state)
+            raise CheqdDIDManagerError(f"Error registering DID: {message}")
+
+    def _should_retry(self, error: CheqdDIDManagerError) -> bool:
+        """Determine if the request should be retried based on the error."""
+        return "account sequence mismatch" in str(error)
 
     async def update(self, did: str, did_doc: dict, options: dict = None) -> dict:
         """Update a Cheqd DID."""
