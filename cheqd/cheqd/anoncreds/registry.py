@@ -710,7 +710,7 @@ class DIDCheqdRegistry(BaseAnonCredsResolver, BaseAnonCredsRegistrar):
         max_retries: int = 3,
         retry_delay: float = 1.0,
     ) -> PublishResourceResponse:
-        """Create, Sign and Publish a Resource with retry logic for sequence mismatches."""
+        """Create, Sign and Publish a Resource with retry for sequence mismatches."""
         cheqd_manager = CheqdDIDManager(profile, registrar_url, resolver_url)
 
         async with profile.session() as session:
@@ -743,6 +743,7 @@ class DIDCheqdRegistry(BaseAnonCredsResolver, BaseAnonCredsRegistrar):
                 except AnonCredsRegistrationError as e:
                     last_error = e
                     if not DIDCheqdRegistry._should_retry(resource_state):
+                        LOGGER.error("Should not retry %s", resource_state)
                         raise
 
                     retry_count += 1
