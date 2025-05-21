@@ -633,12 +633,12 @@ class DIDCheqdRegistry(BaseAnonCredsResolver, BaseAnonCredsRegistrar):
 
     @staticmethod
     def _should_retry(
-        resource_state: Union[DidUrlSuccessState, DidUrlActionState, DidUrlErrorState],
+        error: AnonCredsRegistrationError,
     ) -> bool:
         """Determine if the request should be retried based on the response state."""
-        if not isinstance(resource_state, DidUrlErrorState):
+        if not isinstance(error, AnonCredsRegistrationError):
             return False
-        return "account sequence mismatch" in resource_state.description
+        return "account sequence mismatch" in str(error)
 
     @staticmethod
     async def _create_initial_resource(
@@ -742,8 +742,8 @@ class DIDCheqdRegistry(BaseAnonCredsResolver, BaseAnonCredsRegistrar):
 
                 except AnonCredsRegistrationError as e:
                     last_error = e
-                    if not DIDCheqdRegistry._should_retry(resource_state):
-                        LOGGER.error("Should not retry %s", resource_state)
+                    if not DIDCheqdRegistry._should_retry(last_error):
+                        LOGGER.error("Should not retry %s", last_error)
                         raise
 
                     retry_count += 1
@@ -845,8 +845,8 @@ class DIDCheqdRegistry(BaseAnonCredsResolver, BaseAnonCredsRegistrar):
 
                 except AnonCredsRegistrationError as e:
                     last_error = e
-                    if not DIDCheqdRegistry._should_retry(resource_state):
-                        LOGGER.error("Should not retry %s", resource_state)
+                    if not DIDCheqdRegistry._should_retry(last_error):
+                        LOGGER.error("Should not retry %s", last_error)
                         raise
 
                     retry_count += 1
