@@ -96,6 +96,7 @@ class CheqdDIDManager(BaseDIDManager):
                 except CheqdDIDManagerError as e:
                     last_error = e
                     if not self._should_retry(e):
+                        LOGGER.error("Should not retry %s", e)
                         raise
                     retry_count += 1
                     if retry_count <= max_retries:
