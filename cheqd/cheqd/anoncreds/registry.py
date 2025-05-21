@@ -692,7 +692,7 @@ class DIDCheqdRegistry(BaseAnonCredsResolver, BaseAnonCredsRegistrar):
         LOGGER.debug("Resource state %s", resource_state)
 
         if resource_state.state != "finished":
-            LOGGER.error("Error publishing Resource %s", resource_state)
+            LOGGER.error("Error publishing Resource (not finished) %s", resource_state)
             message = _get_error_message(resource_state)
             raise AnonCredsRegistrationError(f"Error publishing Resource: {message}")
 
@@ -771,65 +771,102 @@ class DIDCheqdRegistry(BaseAnonCredsResolver, BaseAnonCredsRegistrar):
         registrar_url: str,
         resolver_url: str,
         options: ResourceUpdateRequestOptions,
+        max_retries: int = 3,
+        retry_delay: float = 1.0,
     ) -> PublishResourceResponse:
-        """Update, Sign and Publish a Resource."""
+        """Update, Sign and Publish a Resource with retry for sequence mismatches."""
         cheqd_manager = CheqdDIDManager(profile, registrar_url, resolver_url)
         async with profile.session() as session:
             wallet = session.inject_or(BaseWallet)
             if not wallet:
                 raise WalletError("No wallet available")
-            try:
-                # request update resource operation
-                LOGGER.debug("Updating resource %s", options)
-                updated_request_res = await cheqd_manager.registrar.update_resource(
-                    options
-                )
-                LOGGER.debug("Updated resource %s", updated_request_res)
 
-                job_id: str = updated_request_res.jobId
-                resource_state = updated_request_res.didUrlState
+            retry_count = 0
+            last_error = None
 
-                if isinstance(resource_state, DidUrlActionState):
-                    signing_requests = resource_state.signingRequest
-                    if not signing_requests:
-                        raise Exception("No signing requests available for update.")
-                    # sign all requests
-                    LOGGER.debug("Signing requests %s", signing_requests)
-                    signed_responses = await CheqdDIDManager.sign_requests(
-                        wallet, signing_requests
-                    )
-                    LOGGER.debug("Signed responses %s", signed_responses)
-                    # publish resource
+            while retry_count <= max_retries:
+                try:
+                    # request update resource operation
                     LOGGER.debug("Updating resource %s", options)
-                    publish_resource_res = await cheqd_manager.registrar.update_resource(
-                        SubmitSignatureOptions(
-                            jobId=job_id,
-                            secret=Secret(signingResponse=signed_responses),
-                            did=options.did,
-                        ),
+                    updated_request_res = await cheqd_manager.registrar.update_resource(
+                        options
                     )
-                    resource_state = publish_resource_res.didUrlState
-                    LOGGER.debug("Resource state %s", resource_state)
-                    if resource_state.state != "finished":
-                        LOGGER.error("Error publishing Resource %s", resource_state)
+                    LOGGER.debug("Updated resource %s", updated_request_res)
+
+                    job_id: str = updated_request_res.jobId
+                    resource_state = updated_request_res.didUrlState
+
+                    if isinstance(resource_state, DidUrlActionState):
+                        signing_requests = resource_state.signingRequest
+                        if not signing_requests:
+                            raise Exception("No signing requests available for update.")
+                        # sign all requests
+                        LOGGER.debug("Signing requests %s", signing_requests)
+                        signed_responses = await CheqdDIDManager.sign_requests(
+                            wallet, signing_requests
+                        )
+                        LOGGER.debug("Signed responses %s", signed_responses)
+                        # publish resource
+                        LOGGER.debug("Updating resource %s", options)
+                        publish_resource_res = (
+                            await cheqd_manager.registrar.update_resource(
+                                SubmitSignatureOptions(
+                                    jobId=job_id,
+                                    secret=Secret(signingResponse=signed_responses),
+                                    did=options.did,
+                                ),
+                            )
+                        )
+                        resource_state = publish_resource_res.didUrlState
+                        LOGGER.debug("Resource state %s", resource_state)
+                        if resource_state.state != "finished":
+                            LOGGER.error(
+                                "Error publishing Resource (bad state) %s", resource_state
+                            )
+                            message = _get_error_message(resource_state)
+                            raise AnonCredsRegistrationError(
+                                f"Error publishing Resource: {message}"
+                            )
+                        result = PublishResourceResponse(
+                            content=resource_state.content,
+                            did_url=resource_state.didUrl,
+                        )
+                        LOGGER.debug("Published resource %s", result)
+                        return result
+                    else:
+                        LOGGER.error(
+                            "Error publishing Resource (bad resource state) %s",
+                            resource_state,
+                        )
                         message = _get_error_message(resource_state)
                         raise AnonCredsRegistrationError(
                             f"Error publishing Resource: {message}"
                         )
-                    result = PublishResourceResponse(
-                        content=resource_state.content,
-                        did_url=resource_state.didUrl,
-                    )
-                    LOGGER.debug("Published resource %s", result)
-                    return result
-                else:
-                    LOGGER.error("Error publishing Resource %s", resource_state)
-                    message = _get_error_message(resource_state)
-                    raise AnonCredsRegistrationError(
-                        f"Error publishing Resource: {message}"
-                    )
-            except Exception as err:
-                raise AnonCredsRegistrationError(f"{err}")
+
+                except AnonCredsRegistrationError as e:
+                    last_error = e
+                    if not DIDCheqdRegistry._should_retry(resource_state):
+                        LOGGER.error("Should not retry %s", resource_state)
+                        raise
+
+                    retry_count += 1
+                    if retry_count <= max_retries:
+                        LOGGER.warning(
+                            "Account sequence mismatch detected, retrying (%d/%d)",
+                            retry_count,
+                            max_retries,
+                        )
+                        await asyncio.sleep(retry_delay)
+                    else:
+                        LOGGER.error(
+                            "Max retries exceeded for resource update: %s",
+                            str(last_error),
+                        )
+                        raise
+
+                except Exception as err:
+                    LOGGER.error("Unexpected error during resource update: %s", str(err))
+                    raise AnonCredsRegistrationError(f"{err}")
 
 
 def _get_error_message(
