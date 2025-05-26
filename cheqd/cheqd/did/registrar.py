@@ -129,6 +129,7 @@ class DIDRegistrar(BaseDIDRegistrar):
 
     async def _acquire_file_lock(self) -> None:
         """Acquire a file lock with retry mechanism and content management."""
+        os.makedirs(os.path.dirname(self.LOCK_FILE_PATH), exist_ok=True)
         retry_count = 0
         while retry_count < self._max_retries:
             try:
