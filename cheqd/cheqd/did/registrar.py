@@ -27,7 +27,7 @@ LOGGER = logging.getLogger(__name__)
 
 # Constants for configuration
 DEFAULT_REGISTRAR_URL = "http://localhost:9080/1.0/"
-DEFAULT_LOCK_PATH = "/tmp/lock/did_registrar.lock"
+DEFAULT_LOCK_PATH = "/tmp/locks/did_registrar.lock"
 DEFAULT_GRACE_PERIOD = 1  # seconds
 DEFAULT_MAX_RETRIES = 20
 DEFAULT_RETRY_DELAY = 5.00  # seconds
@@ -79,6 +79,7 @@ class DIDRegistrar(BaseDIDRegistrar):
 
     async def _read_lock_file_content(self) -> Optional[LockFileContent]:
         """Read the current content of the lock file."""
+        os.makedirs(os.path.dirname(self.LOCK_FILE_PATH), exist_ok=True)
         try:
             if os.path.exists(self.LOCK_FILE_PATH):
                 with open(self.LOCK_FILE_PATH, "r") as f:
