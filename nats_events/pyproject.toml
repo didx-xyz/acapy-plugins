@@ -15,7 +15,7 @@ fastapi-slim = "^0.115.2"
 nest-asyncio = "^1.5.5"
 pydantic = "^2.7"
 uvicorn = "^0.34.0"
-nats-py = { git = "https://github.com/ff137/nats.py", branch = "feat-661-uuid", extras = [
+nats-py = { git = "https://github.com/ff137/nats.py", tag = "v2.10.0-w-orjson", extras = [
     "nkeys",
     "orjson",
     "uuid_utils",
