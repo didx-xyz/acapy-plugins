@@ -27,12 +27,16 @@ LOGGER = logging.getLogger(__name__)
 
 # Constants for configuration
 DEFAULT_REGISTRAR_URL = "http://localhost:9080/1.0/"
-DEFAULT_LOCK_PATH = "/tmp/locks/did_registrar.lock"
-DEFAULT_GRACE_PERIOD = 1  # seconds
-DEFAULT_MAX_RETRIES = 20
-DEFAULT_RETRY_DELAY = 5.00  # seconds
-DEFAULT_FRESH_TRANSACTION_WINDOW = 0.5  # seconds
-DEFAULT_RESPONSE_MATCH_TIMEOUT = 0.5  # seconds
+DEFAULT_LOCK_PATH = os.getenv("DEFAULT_LOCK_PATH", "/tmp/locks/did_registrar.lock")
+DEFAULT_GRACE_PERIOD = float(os.getenv("DEFAULT_GRACE_PERIOD", "1"))  # seconds
+DEFAULT_MAX_RETRIES = int(os.getenv("DEFAULT_MAX_RETRIES", "20"))
+DEFAULT_RETRY_DELAY = float(os.getenv("DEFAULT_RETRY_DELAY", "5.00"))  # seconds
+DEFAULT_FRESH_TRANSACTION_WINDOW = float(
+    os.getenv("DEFAULT_FRESH_TRANSACTION_WINDOW", "0.5")
+)  # seconds
+DEFAULT_RESPONSE_MATCH_TIMEOUT = float(
+    os.getenv("DEFAULT_RESPONSE_MATCH_TIMEOUT", "0.5")
+)  # seconds
 
 
 class LockFileContent(BaseModel):
