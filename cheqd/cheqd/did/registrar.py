@@ -1,6 +1,7 @@
 """DID Registrar for Cheqd."""
 
 import asyncio
+from copy import deepcopy
 import json
 import logging
 import os
@@ -177,7 +178,9 @@ class DIDRegistrar(BaseDIDRegistrar):
                     raise DIDRegistrarError(
                         "Failed to acquire file lock after maximum retries"
                     )
-                LOGGER.debug("Waiting for %s seconds before retrying", self._retry_delay)
+                LOGGER.debug(
+                    "Waiting for %d seconds before retrying", int(self._retry_delay)
+                )
                 await asyncio.sleep(self._retry_delay)
 
     async def _release_file_lock(self) -> None:
@@ -417,7 +420,36 @@ class DIDRegistrar(BaseDIDRegistrar):
         """Create a DID Linked Resource."""
         LOGGER.debug("Creating resource %s", options)
         res = await self._execute_request("createResource", options)
-        LOGGER.debug("Create Resource Response: %s", res)
+
+        # Redact serializedPayload and data values to avoid massive payload in logs
+        if LOGGER.isEnabledFor(logging.DEBUG):
+            log_res = deepcopy(res)
+            if (
+                "didUrlState" in log_res
+                and "signingRequest" in log_res["didUrlState"]
+                and "serializedPayload" in log_res["didUrlState"]["signingRequest"]
+            ):
+                num_chars_redacted = len(
+                    log_res["didUrlState"]["signingRequest"]["serializedPayload"]
+                )
+                log_res["didUrlState"]["signingRequest"]["serializedPayload"] = (
+                    f"<Removed {num_chars_redacted} characters from log>"
+                )
+
+            if (
+                "didUrlState" in log_res
+                and "resourcePayload" in log_res["didUrlState"]
+                and "data" in log_res["didUrlState"]["resourcePayload"]
+            ):
+                num_chars_redacted = len(
+                    str(log_res["didUrlState"]["resourcePayload"]["data"])
+                )
+                log_res["didUrlState"]["resourcePayload"]["data"] = (
+                    f"<Removed {num_chars_redacted} characters from log>"
+                )
+
+            LOGGER.debug("Create Resource Response: %s", log_res)
+
         return ResourceResponse(**res)
 
     async def update_resource(

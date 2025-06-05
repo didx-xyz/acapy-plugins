@@ -519,10 +519,11 @@ class DIDCheqdRegistry(BaseAnonCredsResolver, BaseAnonCredsRegistrar):
         _options: Optional[dict] = None,
     ) -> RevListResult:
         """Register a revocation list on the registry."""
-        LOGGER.debug("Registering revocation list %s", rev_list)
+        rev_reg_def_id = rev_list.rev_reg_def_id
+        LOGGER.debug("Registering revocation list for %s", rev_reg_def_id)
         revocation_registry_definition = await self.get_revocation_registry_definition(
             profile,
-            rev_list.rev_reg_def_id,
+            rev_reg_def_id,
         )
         resource_name = revocation_registry_definition.revocation_registry_metadata.get(
             "resourceName"
@@ -538,7 +539,7 @@ class DIDCheqdRegistry(BaseAnonCredsResolver, BaseAnonCredsRegistrar):
                 {
                     "revocationList": rev_list.revocation_list,
                     "currentAccumulator": rev_list.current_accumulator,
-                    "revRegDefId": rev_list.rev_reg_def_id,
+                    "revRegDefId": rev_reg_def_id,
                 }
             ),
             did=rev_reg_def.issuer_id,
@@ -566,7 +567,7 @@ class DIDCheqdRegistry(BaseAnonCredsResolver, BaseAnonCredsRegistrar):
             },
             revocation_list_metadata={},
         )
-        LOGGER.debug("Revocation list registered successfully %s", result)
+        LOGGER.debug("Revocation list registered successfully for %s", rev_reg_def_id)
         return result
 
     async def update_revocation_list(
@@ -646,9 +647,7 @@ class DIDCheqdRegistry(BaseAnonCredsResolver, BaseAnonCredsRegistrar):
         options: ResourceCreateRequestOptions,
     ) -> Tuple[str, DidUrlActionState]:
         """Create the initial resource and get signing requests."""
-        LOGGER.debug("Creating initial resource %s", options)
         create_request_res = await cheqd_manager.registrar.create_resource(options)
-        LOGGER.debug("Created initial resource %s", create_request_res)
 
         job_id = create_request_res.jobId
         resource_state = create_request_res.didUrlState
@@ -689,10 +688,15 @@ class DIDCheqdRegistry(BaseAnonCredsResolver, BaseAnonCredsRegistrar):
         )
 
         resource_state = publish_resource_res.didUrlState
-        LOGGER.debug("Resource state %s", resource_state)
 
         if resource_state.state != "finished":
-            LOGGER.error("Error publishing Resource (not finished) %s", resource_state)
+            LOGGER.error(
+                "Error publishing Resource (not finished): "
+                "state: %s, reason: %s, description: %s",
+                resource_state.state,
+                resource_state.reason,
+                resource_state.description,
+            )
             message = _get_error_message(resource_state)
             raise AnonCredsRegistrationError(f"Error publishing Resource: {message}")
 
