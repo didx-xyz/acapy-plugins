@@ -183,5 +183,5 @@ def create_did_payload(
         "verificationMethod": verification_methods,
         "authentication": [key["keyId"] for key in verification_keys],
         "assertionMethod": keys,
-        "service": [service],
+        # "service": [service],
     }
