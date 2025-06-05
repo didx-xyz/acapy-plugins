@@ -1,17 +1,17 @@
 from unittest.mock import AsyncMock
 
 from cheqd.cheqd.did.base import (
-    ResourceResponse,
-    DidUrlActionState,
-    DidResponse,
     DidActionState,
-    SigningRequest,
-    DidSuccessState,
-    PartialDIDDocumentSchema,
-    VerificationMethodSchema,
     DidErrorState,
+    DidResponse,
+    DidSuccessState,
+    DidUrlActionState,
     DidUrlErrorState,
     DidUrlSuccessState,
+    PartialDIDDocumentSchema,
+    ResourceResponse,
+    SigningRequest,
+    VerificationMethodSchema,
 )
 
 registrar_generate_did_doc_response = {

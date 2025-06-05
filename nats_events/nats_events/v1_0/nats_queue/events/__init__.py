@@ -129,9 +129,7 @@ async def on_startup(profile: Profile, event: Event, retries: int = 5, delay: in
             is_working = account_info.streams > 0
             LOGGER.info("JetStream account info: %s", account_info)
             if is_working:
-                LOGGER.info(
-                    "JetStream is working with %d streams", account_info.streams
-                )
+                LOGGER.info("JetStream is working with %d streams", account_info.streams)
                 break
             else:
                 LOGGER.warning("JetStream is not working properly, no streams found")
@@ -276,7 +274,6 @@ async def handle_event(profile: Profile, event: EventWithMetadata):
         LOGGER.warning("JetStream context not available. Setting up JetStream again")
         js = await nats_jetstream_setup(profile, event)
 
-    LOGGER.debug("Handling event: %s", event)
     wallet_id: Optional[str] = profile.settings.get("wallet.id")
     try:
         event_payload = process_event_payload(event_payload_to_process)

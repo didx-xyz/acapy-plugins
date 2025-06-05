@@ -11,8 +11,8 @@ from ..base import (
     DidCreateRequestOptions,
     DidDeactivateRequestOptions,
     DidUpdateRequestOptions,
-    SubmitSignatureOptions,
     PartialDIDDocumentSchema,
+    SubmitSignatureOptions,
 )
 from ..manager import CheqdDIDManager
 from .mocks import (

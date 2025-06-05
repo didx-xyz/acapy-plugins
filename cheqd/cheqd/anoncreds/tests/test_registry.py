@@ -2,9 +2,7 @@ import time
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from acapy_agent.anoncreds.base import (
-    AnonCredsRegistrationError,
-)
+from acapy_agent.anoncreds.base import AnonCredsRegistrationError
 from acapy_agent.anoncreds.models.credential_definition import (
     CredDefResult,
     GetCredDefResult,
@@ -12,23 +10,23 @@ from acapy_agent.anoncreds.models.credential_definition import (
 from acapy_agent.anoncreds.models.revocation import (
     GetRevListResult,
     GetRevRegDefResult,
-    RevRegDefResult,
     RevListResult,
+    RevRegDefResult,
 )
 from acapy_agent.anoncreds.models.schema import GetSchemaResult, SchemaResult
 from acapy_agent.anoncreds.models.schema_info import AnonCredsSchemaInfo
 
 from ...did.base import (
+    Options,
     ResourceCreateRequestOptions,
     ResourceUpdateRequestOptions,
-    Options,
 )
 from ...did.manager import CheqdDIDManager
 from ...did.tests.mocks import (
-    registrar_resource_responses_no_signing_request,
-    setup_mock_registrar,
     registrar_resource_responses_network_fail,
+    registrar_resource_responses_no_signing_request,
     registrar_resource_responses_not_finished,
+    setup_mock_registrar,
 )
 from ...validation import CHEQD_DID_VALIDATE
 from ..registry import DIDCheqdRegistry

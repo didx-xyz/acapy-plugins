@@ -6,7 +6,6 @@ from acapy_agent.wallet.did_method import DIDMethods
 from acapy_agent.wallet.key_type import KeyTypes
 from yarl import URL
 
-from ...did_method import CHEQD
 from ...did.base import (
     DidCreateRequestOptions,
     DidDeactivateRequestOptions,
@@ -14,6 +13,7 @@ from ...did.base import (
     ResourceCreateRequestOptions,
     ResourceUpdateRequestOptions,
 )
+from ...did_method import CHEQD
 from ..registrar import DIDRegistrar
 
 

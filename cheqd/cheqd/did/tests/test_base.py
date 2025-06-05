@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock
 import pytest
 from aiohttp import web
 
-from ..base import BaseDIDManager, SigningResponse, SigningRequest
+from ..base import BaseDIDManager, SigningRequest, SigningResponse
 
 
 @pytest.mark.asyncio
