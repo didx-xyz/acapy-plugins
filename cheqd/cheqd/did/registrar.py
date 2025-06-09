@@ -1,13 +1,13 @@
 """DID Registrar for Cheqd."""
 
 import asyncio
-from copy import deepcopy
-import json
 import logging
 import os
+from copy import deepcopy
 from time import time
 from typing import Dict, Optional
 
+from acapy_agent.utils.async_lock import AsyncRedisLock
 from aiohttp import ClientResponse, ClientSession
 from pydantic import BaseModel, ValidationError
 
@@ -28,7 +28,7 @@ LOGGER = logging.getLogger(__name__)
 
 # Constants for configuration
 DEFAULT_REGISTRAR_URL = "http://localhost:9080/1.0/"
-DEFAULT_LOCK_PATH = os.getenv("DEFAULT_LOCK_PATH", "/tmp/locks/did_registrar.lock")
+
 DEFAULT_GRACE_PERIOD = float(os.getenv("DEFAULT_GRACE_PERIOD", "1"))  # seconds
 DEFAULT_MAX_RETRIES = int(os.getenv("DEFAULT_MAX_RETRIES", "20"))
 DEFAULT_RETRY_DELAY = float(os.getenv("DEFAULT_RETRY_DELAY", "5.00"))  # seconds
@@ -40,16 +40,6 @@ DEFAULT_RESPONSE_MATCH_TIMEOUT = float(
 )  # seconds
 
 
-class LockFileContent(BaseModel):
-    """Content structure for the lock file."""
-
-    current_job_id: Optional[str] = None
-    current_job_start: Optional[float] = None
-    current_job_endpoint: Optional[str] = None
-    last_transaction_time: Optional[float] = None
-    instance_id: str  # Unique identifier for this instance
-
-
 class DIDRegistrar(BaseDIDRegistrar):
     """Universal DID Registrar implementation with improved sequence management."""
 
@@ -57,18 +47,15 @@ class DIDRegistrar(BaseDIDRegistrar):
         self,
         method: str,
         registrar_url: Optional[str] = None,
-        lock_path: Optional[str] = None,
         grace_period: float = DEFAULT_GRACE_PERIOD,
         max_retries: int = DEFAULT_MAX_RETRIES,
         retry_delay: float = DEFAULT_RETRY_DELAY,
         fresh_transaction_window: float = DEFAULT_FRESH_TRANSACTION_WINDOW,
         response_match_timeout: float = DEFAULT_RESPONSE_MATCH_TIMEOUT,
-        instance_id: Optional[str] = None,
     ) -> None:
         """Initialize the Cheqd Registrar with configurable parameters."""
         super().__init__()
         self.DID_REGISTRAR_BASE_URL = registrar_url or DEFAULT_REGISTRAR_URL
-        self.LOCK_FILE_PATH = lock_path or DEFAULT_LOCK_PATH
         self.method = method
         self._pending_jobs: Dict[str, float] = {}
         self._grace_period = grace_period
@@ -76,210 +63,51 @@ class DIDRegistrar(BaseDIDRegistrar):
         self._retry_delay = retry_delay
         self._fresh_transaction_window = fresh_transaction_window
         self._response_match_timeout = response_match_timeout
-        self._lock = asyncio.Lock()  # In-memory lock for additional safety
-        self._instance_id = instance_id or f"instance_{int(time() * 1000)}"
-        self._lock_file_content: Optional[LockFileContent] = None
+        self._lock = AsyncRedisLock("cheqd-concurrency-lock")
         self._last_transaction_time: Optional[float] = None
-        self._lock_file: Optional[int] = None
-
-    async def _read_lock_file_content(self) -> Optional[LockFileContent]:
-        """Read the current content of the lock file."""
-        os.makedirs(os.path.dirname(self.LOCK_FILE_PATH), exist_ok=True)
-        try:
-            if os.path.exists(self.LOCK_FILE_PATH):
-                with open(self.LOCK_FILE_PATH, "r") as f:
-                    try:
-                        content = json.load(f)
-                        return LockFileContent(**content)
-                    except json.JSONDecodeError as e:
-                        LOGGER.warning("Invalid JSON in lock file: %s", str(e))
-                        # Try to clean up the lock file
-                        try:
-                            os.remove(self.LOCK_FILE_PATH)
-                        except Exception as cleanup_error:
-                            LOGGER.error(
-                                "Failed to clean up invalid lock file: %s",
-                                str(cleanup_error),
-                            )
-        except Exception as e:
-            LOGGER.warning("Error reading lock file content: %s", str(e))
-        return None
-
-    async def _write_lock_file_content(self, content: LockFileContent) -> None:
-        """Write content to the lock file."""
-        if self._lock_file is None:
-            LOGGER.error(
-                "Attempted to write to lock file without an open file descriptor"
-            )
-            return
-
-        try:
-            content_dict = content.model_dump()
-            LOGGER.debug("Writing lock file content: %s", content_dict)
-
-            # Reset file position to start
-            os.lseek(self._lock_file, 0, os.SEEK_SET)
-            # Truncate the file
-            os.ftruncate(self._lock_file, 0)
-            # Write new content
-            os.write(self._lock_file, json.dumps(content_dict).encode())
-            os.fsync(self._lock_file)  # Ensure content is written to disk
-        except Exception as e:
-            LOGGER.error("Error writing to lock file: %s", str(e))
-            raise DIDRegistrarError(f"Failed to write to lock file: {str(e)}")
-
-    async def _acquire_file_lock(self) -> None:
-        """Acquire a file lock with retry mechanism and content management."""
-        os.makedirs(os.path.dirname(self.LOCK_FILE_PATH), exist_ok=True)
-        retry_count = 0
-        while retry_count < self._max_retries:
-            try:
-                # flags: O_CREAT: create the file if it doesn't exist, O_EXCL: fail if the file already exists, O_RDWR: open for reading and writing
-                flags = os.O_CREAT | os.O_EXCL | os.O_RDWR
-                self._lock_file = os.open(self.LOCK_FILE_PATH, flags)
-                LOGGER.debug("File lock acquired")
-
-                # Initialize lock file content
-                self._lock_file_content = LockFileContent(
-                    instance_id=self._instance_id,
-                    last_transaction_time=self._last_transaction_time,
-                )
-                await self._write_lock_file_content(self._lock_file_content)
-                return
-
-            except FileExistsError:
-                # Try to read existing content
-                existing_content = await self._read_lock_file_content()
-                if existing_content:
-                    current_time = time()
-                    if (
-                        existing_content.current_job_start
-                        and current_time - existing_content.current_job_start
-                        > self._grace_period
-                    ):
-                        # Job has timed out, try to remove the lock file
-                        try:
-                            os.remove(self.LOCK_FILE_PATH)
-                            LOGGER.debug("Lock file removed")
-                            continue
-                        except Exception as e:
-                            LOGGER.error("Error removing lock file: %s", str(e))
-
-                    LOGGER.debug(
-                        "Waiting for job %s from instance %s (started %s seconds ago)",
-                        existing_content.current_job_id,
-                        existing_content.instance_id,
-                        current_time - (existing_content.current_job_start or 0),
-                    )
-
-                retry_count += 1
-                if retry_count >= self._max_retries:
-                    LOGGER.info("Failed to acquire file lock after maximum retries")
-                    raise DIDRegistrarError(
-                        "Failed to acquire file lock after maximum retries"
-                    )
-                LOGGER.debug(
-                    "Waiting for %d seconds before retrying", int(self._retry_delay)
-                )
-                await asyncio.sleep(self._retry_delay)
-
-    async def _release_file_lock(self) -> None:
-        """Release the file lock safely."""
-        try:
-            if self._lock_file is not None:
-                if self._lock_file_content:
-                    self._lock_file_content.current_job_id = None
-                    self._lock_file_content.current_job_start = None
-                    self._lock_file_content.current_job_endpoint = None
-                    try:
-                        await self._write_lock_file_content(self._lock_file_content)
-                    except Exception as e:
-                        LOGGER.warning(
-                            "Failed to write final lock file content: %s", str(e)
-                        )
-
-                LOGGER.debug("Closing lock file")
-                os.close(self._lock_file)
-                self._lock_file = None
-                try:
-                    LOGGER.debug("Removing lock file")
-                    os.remove(self.LOCK_FILE_PATH)
-                except Exception as e:
-                    LOGGER.warning("Failed to remove lock file: %s", str(e))
-                LOGGER.debug("File lock released")
-        except Exception as e:
-            LOGGER.error("Error releasing file lock: %s", str(e))
-            # Don't raise here to ensure cleanup continues
 
     async def _handle_initial_request(self, endpoint: str, options: BaseModel) -> dict:
         """Handle the initial request with proper locking and job tracking."""
         async with self._lock:
-            try:
-                await self._acquire_file_lock()
-                LOGGER.debug("Lock acquired for %s request", endpoint)
+            LOGGER.debug("Lock acquired for %s request", endpoint)
 
-                response = await self._process_initial_request(endpoint, options)
-                job_id = response.get("jobId")
+            response = await self._process_initial_request(endpoint, options)
+            job_id = response.get("jobId")
 
-                if job_id:
-                    LOGGER.debug("Adding jobId to pending jobs: %s", job_id)
-                    self._pending_jobs[job_id] = time()
+            if job_id:
+                LOGGER.debug("Adding jobId to pending jobs: %s", job_id)
+                self._pending_jobs[job_id] = time()
+            else:
+                LOGGER.warning(
+                    "No jobId returned from initial %s request. Response: %s",
+                    endpoint,
+                    response,
+                )
 
-                    # Update lock file content
-                    if self._lock_file_content:
-                        self._lock_file_content.current_job_id = job_id
-                        self._lock_file_content.current_job_start = time()
-                        self._lock_file_content.current_job_endpoint = endpoint
-                        await self._write_lock_file_content(self._lock_file_content)
-                else:
-                    LOGGER.warning(
-                        "No jobId returned from initial %s request. Response: %s",
-                        endpoint,
-                        response,
-                    )
+            await asyncio.sleep(self._grace_period)
 
-                await asyncio.sleep(self._grace_period)
-                return response
-
-            finally:
-                await self._release_file_lock()
-                LOGGER.debug("Lock released for %s request", endpoint)
+        LOGGER.debug("Lock released for %s request", endpoint)
+        return response
 
     async def _handle_signature_request(
         self, endpoint: str, options: SubmitSignatureOptions
     ) -> dict:
         """Handle the signature request and update job tracking."""
         async with self._lock:
-            try:
-                await self._acquire_file_lock()
-                LOGGER.debug("Lock acquired for signature request")
+            LOGGER.debug("Lock acquired for signature request")
 
-                response = await self._submit_request(endpoint, options)
-                job_id = options.jobId
+            response = await self._submit_request(endpoint, options)
+            job_id = options.jobId
 
-                if job_id in self._pending_jobs:
-                    LOGGER.debug("Removing jobId from pending jobs: %s", job_id)
-                    del self._pending_jobs[job_id]
-                    self._last_transaction_time = time()
+            if job_id in self._pending_jobs:
+                LOGGER.debug("Removing jobId from pending jobs: %s", job_id)
+                del self._pending_jobs[job_id]
+                self._last_transaction_time = time()
+            else:
+                LOGGER.warning("JobId done but not found in pending jobs: %s", job_id)
 
-                    # Update lock file content if we have it
-                    if self._lock_file_content:
-                        self._lock_file_content.last_transaction_time = (
-                            self._last_transaction_time
-                        )
-                        if self._lock_file_content.current_job_id == job_id:
-                            self._lock_file_content.current_job_id = None
-                            self._lock_file_content.current_job_start = None
-                            self._lock_file_content.current_job_endpoint = None
-                        await self._write_lock_file_content(self._lock_file_content)
-                else:
-                    LOGGER.warning("JobId done but not found in pending jobs: %s", job_id)
-
-                return response
-
-            finally:
-                await self._release_file_lock()
-                LOGGER.debug("Lock released for signature request")
+        LOGGER.debug("Lock released for signature request")
+        return response
 
     async def _execute_request(self, endpoint: str, options: BaseModel) -> dict:
         """Execute a request to the DID Registrar with improved sequence management."""
@@ -311,7 +139,7 @@ class DIDRegistrar(BaseDIDRegistrar):
         )
 
     async def _process_initial_request(self, endpoint: str, options: BaseModel) -> dict:
-        """Process the initial request with improved sequence management and double-check."""
+        """Process the initial request with improved sequence management."""
         retry_count = 0
         while retry_count < self._max_retries:
             try:
@@ -333,7 +161,8 @@ class DIDRegistrar(BaseDIDRegistrar):
 
                     if not await self._verify_response_match(response1, response2):
                         raise DIDRegistrarError(
-                            f"cheqd: did-registrar: {endpoint}: Response mismatch in double-check"
+                            f"cheqd: did-registrar: {endpoint}: "
+                            "Response mismatch in double-check"
                         )
                     return response1
                 else:
