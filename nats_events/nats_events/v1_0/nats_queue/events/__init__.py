@@ -49,7 +49,7 @@ async def setup(context: InjectionContext):
 
 RECORD_RE = re.compile(r"acapy::record::([^:]*)(?:::(.*))?")
 WEBHOOK_RE = re.compile(r"acapy::webhook::{.*}")
-MESSAGE_RE = re.compile(r"acapy::basicmessage::{.*}")
+MESSAGE_RE = re.compile(r"acapy::basicmessage::.*")
 
 
 async def nats_jetstream_setup(profile: Profile, event: Event) -> JetStreamContext:
