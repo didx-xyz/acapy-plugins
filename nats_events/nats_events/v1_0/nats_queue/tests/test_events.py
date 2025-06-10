@@ -171,9 +171,7 @@ class TestNATSEvents(IsolatedAsyncioTestCase):
                 to_session_only=False,
             ),
             metadata=MagicMock(
-                pattern=MagicMock(
-                    pattern="acapy::outbound-message::queued_for_delivery"
-                )
+                pattern=MagicMock(pattern="acapy::outbound-message::queued_for_delivery")
             ),
         )
         await handle_event(self.profile, real_event_with_metadata)
@@ -185,9 +183,7 @@ class TestNATSEvents(IsolatedAsyncioTestCase):
                     {"@type": "did:sov:BzCbsNYhMrjHiqZDTUASHg;spec/basicmessage/1.0/message", "@id": 
                     "99bf771c-93e4-4482-8ab9-45080927f67c", "content": "test", "sent_time": 
                     "2022-09-01T20:15:23.719131Z"}
-                """.encode(
-                    "utf-8"
-                ),
+                """.encode("utf-8"),
                 endpoint="",
                 payload="{}",
                 reply_session_id="",
@@ -208,18 +204,14 @@ class TestNATSEvents(IsolatedAsyncioTestCase):
                 to_session_only=False,
             ),
             metadata=MagicMock(
-                pattern=MagicMock(
-                    pattern="acapy::outbound-message::queued_for_delivery"
-                )
+                pattern=MagicMock(pattern="acapy::outbound-message::queued_for_delivery")
             ),
         )
         await handle_event(self.profile, real_event_with_metadata)
 
     async def test_handle_event_deliver_webhook(self):
         test_settings = deepcopy(SETTINGS)
-        test_settings["plugin_config"]["nats_queue"]["event"] = {
-            "deliver_webhook": True
-        }
+        test_settings["plugin_config"]["nats_queue"]["event"] = {"deliver_webhook": True}
         self.profile = InMemoryProfile.test_profile(
             {
                 "plugin_config": test_settings["plugin_config"],
