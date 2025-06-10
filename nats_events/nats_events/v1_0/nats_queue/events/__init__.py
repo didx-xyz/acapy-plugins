@@ -49,6 +49,7 @@ async def setup(context: InjectionContext):
 
 RECORD_RE = re.compile(r"acapy::record::([^:]*)(?:::(.*))?")
 WEBHOOK_RE = re.compile(r"acapy::webhook::{.*}")
+MESSAGE_RE = re.compile(r"acapy::basicmessage::{.*}")
 
 
 async def nats_jetstream_setup(profile: Profile, event: Event) -> JetStreamContext:
@@ -178,6 +179,8 @@ def _derive_category(topic: str):
         return match.group(1)
     if WEBHOOK_RE.match(topic):
         return "webhook"
+    if MESSAGE_RE.match(topic):
+        return "basicmessage"
 
 
 def process_event_payload(event_payload: Any):
