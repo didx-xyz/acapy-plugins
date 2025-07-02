@@ -49,6 +49,7 @@ async def setup(context: InjectionContext):
 
 RECORD_RE = re.compile(r"acapy::record::([^:]*)(?:::(.*))?")
 WEBHOOK_RE = re.compile(r"acapy::webhook::{.*}")
+MESSAGE_RE = re.compile(r"acapy::basicmessage::.*")
 
 
 async def nats_jetstream_setup(profile: Profile, event: Event) -> JetStreamContext:
@@ -129,9 +130,7 @@ async def on_startup(profile: Profile, event: Event, retries: int = 5, delay: in
             is_working = account_info.streams > 0
             LOGGER.info("JetStream account info: %s", account_info)
             if is_working:
-                LOGGER.info(
-                    "JetStream is working with %d streams", account_info.streams
-                )
+                LOGGER.info("JetStream is working with %d streams", account_info.streams)
                 break
             else:
                 LOGGER.warning("JetStream is not working properly, no streams found")
@@ -180,6 +179,8 @@ def _derive_category(topic: str):
         return match.group(1)
     if WEBHOOK_RE.match(topic):
         return "webhook"
+    if MESSAGE_RE.match(topic):
+        return "basicmessage"
 
 
 def process_event_payload(event_payload: Any):
@@ -276,7 +277,6 @@ async def handle_event(profile: Profile, event: EventWithMetadata):
         LOGGER.warning("JetStream context not available. Setting up JetStream again")
         js = await nats_jetstream_setup(profile, event)
 
-    LOGGER.debug("Handling event: %s", event)
     wallet_id: Optional[str] = profile.settings.get("wallet.id")
     try:
         event_payload = process_event_payload(event_payload_to_process)

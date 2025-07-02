@@ -1,6 +1,7 @@
 """DID Resolver for Cheqd."""
 
 import json
+import logging
 from dataclasses import dataclass
 from typing import Optional, Pattern, Sequence, Text
 
@@ -17,6 +18,8 @@ from pydantic import BaseModel, ValidationError
 from pydid import DIDDocument
 
 from ..validation import CheqdDID
+
+LOGGER = logging.getLogger(__name__)
 
 
 @dataclass
@@ -84,17 +87,22 @@ class CheqdDIDResolver(BaseDIDResolver):
                 self.DID_RESOLVER_BASE_URL + did,
                 headers=headers,
             ) as response:
+                response_text = await response.text()
                 if response.status == 200:
                     try:
                         resolver_resp = await response.json()
                         return resolver_resp
                     except Exception as err:
-                        raise ResolverError("Response was incorrectly formatted") from err
+                        raise ResolverError(
+                            f"Response was incorrectly formatted: {response_text}"
+                        ) from err
                 if response.status == 404:
                     raise DIDNotFound(f"No document found for {did}")
-            raise ResolverError(
-                "Could not find doc for {}: {}".format(did, await response.text())
-            )
+
+                raise ResolverError(
+                    f"Could not resolve DID {did}. "
+                    f"Status: {response.status}, Response: {response_text}"
+                )
 
     async def resolve(
         self,
@@ -103,6 +111,7 @@ class CheqdDIDResolver(BaseDIDResolver):
         service_accept: Optional[Sequence[Text]] = None,
     ) -> dict:
         """Resolve a DID."""
+        LOGGER.debug("Resolving DID %s", did)
         resolver_resp = await self._resolve(profile, did, service_accept)
 
         did_doc_resp = resolver_resp.get("didDocument")
@@ -114,6 +123,7 @@ class CheqdDIDResolver(BaseDIDResolver):
             # Check if 'deactivated' field is present in didDocumentMetadata
             if did_doc_metadata and did_doc_metadata.get("deactivated") is True:
                 result["deactivated"] = True
+            LOGGER.debug("Resolved DID %s", result)
             return result
         except Exception as err:
             raise ResolverError("Response was incorrectly formatted") from err
@@ -123,11 +133,13 @@ class CheqdDIDResolver(BaseDIDResolver):
     ) -> DIDLinkedResourceWithMetadata:
         """Resolve a Cheqd DID Linked Resource and its Metadata."""
         # Fetch the main resource
+        LOGGER.debug("Dereferencing resource %s", did_url)
         result = await self._resolve(
             profile, did_url, [f"Accept: {DID_URL_DEREFERENCING_HEADER}"]
         )
         try:
             validated_resp = DIDUrlDereferencingResult(**result)
+            LOGGER.debug("Dereferenced resource %s", validated_resp)
             return DIDLinkedResourceWithMetadata(
                 resource=validated_resp.contentStream,
                 metadata=validated_resp.contentMetadata,

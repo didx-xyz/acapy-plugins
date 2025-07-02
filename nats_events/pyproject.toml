@@ -9,18 +9,18 @@ python = "^3.12"
 
 # Define ACA-Py as an optional/extra dependency so it can be
 # explicitly installed with the plugin if desired.
-acapy-agent-didx = { version = "==1.3.0rc1.post20250417", source = "testpypi", optional = true }
+acapy-agent-didx = { version = ">=1.3.1.post20250702", source = "testpypi", optional = true }
 aiohttp = "^3.9.10"
 fastapi-slim = "^0.115.2"
 nest-asyncio = "^1.5.5"
 pydantic = "^2.7"
 uvicorn = "^0.34.0"
-nats-py = { git = "https://github.com/ff137/nats.py", branch = "feat-661-uuid", extras = [
+nats-py = { git = "https://github.com/ff137/nats.py", tag = "v2.10.0-w-orjson", extras = [
     "nkeys",
     "orjson",
     "uuid_utils",
 ] }
-orjson = "~3.10.7"
+orjson = "^3.10.7"
 
 [tool.poetry.extras]
 aca-py = ["acapy-agent-didx"]

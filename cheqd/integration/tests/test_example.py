@@ -12,7 +12,6 @@ from .helpers import (
     create_credential_definition,
     create_did,
     create_schema,
-    update_schema,
     deactivate_did,
     issue_credential_v2,
     load_did,
@@ -22,6 +21,7 @@ from .helpers import (
     save_did,
     save_schema,
     update_did,
+    update_schema,
 )
 
 ISSUER = getenv("ISSUER", "http://issuer:3001")
