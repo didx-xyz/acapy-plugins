@@ -1312,8 +1312,6 @@ groups = ["main"]
 markers = "extra == \"aca-py\""
 files = [
     {file = "jsonpath-ng-1.7.0.tar.gz", hash = "sha256:f6f5f7fd4e5ff79c785f1573b394043b39849fb2bb47bcead935d12b00beab3c"},
-    {file = "jsonpath_ng-1.7.0-py2-none-any.whl", hash = "sha256:898c93fc173f0c336784a3fa63d7434297544b7198124a68f9a3ef9597b0ae6e"},
-    {file = "jsonpath_ng-1.7.0-py3-none-any.whl", hash = "sha256:f3d7f9e848cba1b6da28c55b1c26ff915dc9e0b1ba7e752a53d6da8d5cbd00b6"},
 ]
 
 [package.dependencies]
@@ -2764,6 +2762,22 @@ files = [
 ]
 
 [[package]]
+name = "valkey"
+version = "6.1.0"
+description = "Python client for Valkey forked from redis-py"
+optional = false
+python-versions = ">=3.8"
+groups = ["main"]
+files = [
+    {file = "valkey-6.1.0-py3-none-any.whl", hash = "sha256:cfe769edae894f74ac946eff1e93f7d7f466032c3030ba7e9d089a742459ac9c"},
+    {file = "valkey-6.1.0.tar.gz", hash = "sha256:a652df15ed89c41935ffae6dfd09c56f4a9ab80b592e5ed9204d538e2ddad6d3"},
+]
+
+[package.extras]
+libvalkey = ["libvalkey (>=4.0.1)"]
+ocsp = ["cryptography (>=36.0.1)", "pyopenssl (==23.2.1)", "requests (>=2.31.0)"]
+
+[[package]]
 name = "wcwidth"
 version = "0.2.13"
 description = "Measures the displayed width of unicode strings in a terminal"
@@ -2925,4 +2939,4 @@ aca-py = ["acapy-agent-didx"]
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.12"
-content-hash = "1cca46cfb4fb7ce3c2e9c5fe50a2ec2b07a995753c67d077e5f8eca47e958250"
+content-hash = "2d8989e5d7b87d9c07fc195e0cceada411f4a6147499c27e27c94401f88c2d41"
