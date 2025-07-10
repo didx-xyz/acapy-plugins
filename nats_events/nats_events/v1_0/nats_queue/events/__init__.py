@@ -273,6 +273,7 @@ async def handle_event(profile: Profile, event: EventWithMetadata):
         return  # Skip OutboundMessage types for now
         # event_payload_to_process = process_outbound_message_payload(event.payload)
     else:
+        LOGGER.warning("EVENT:: {}", event)
         event_payload_to_process = event.payload
 
     js = profile.inject_or(JetStreamContext)
