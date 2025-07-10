@@ -265,7 +265,7 @@ async def handle_event(profile: Profile, event: EventWithMetadata):
     pattern = event.metadata.pattern.pattern
     template = config_events.event_topic_maps.get(pattern)
 
-    LOGGER.warning("EVENT:: {}", event)
+    LOGGER.warning("EVENT:: %s", event)
     if not template:
         LOGGER.warning("Could not infer template from pattern: %s", pattern)
         return
