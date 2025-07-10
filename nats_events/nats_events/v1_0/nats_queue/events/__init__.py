@@ -50,6 +50,7 @@ async def setup(context: InjectionContext):
 RECORD_RE = re.compile(r"acapy::record::([^:]*)(?:::(.*))?")
 WEBHOOK_RE = re.compile(r"acapy::webhook::{.*}")
 MESSAGE_RE = re.compile(r"acapy::basicmessage::.*")
+ANONCREDS_RE = re.compile(r"anoncreds::([^:]*)::([^:]*)$")
 
 
 async def nats_jetstream_setup(profile: Profile, event: Event) -> JetStreamContext:
@@ -181,7 +182,9 @@ def _derive_category(topic: str):
         return "webhook"
     if MESSAGE_RE.match(topic):
         return "basicmessage"
-
+    anon_match = ANONCREDS_RE.match(topic)
+    if anon_match:
+        return anon_match.group(1)
 
 def process_event_payload(event_payload: Any):
     """Process event payload."""
@@ -262,6 +265,7 @@ async def handle_event(profile: Profile, event: EventWithMetadata):
     pattern = event.metadata.pattern.pattern
     template = config_events.event_topic_maps.get(pattern)
 
+    LOGGER.warning("EVENT:: %s", event)
     if not template:
         LOGGER.warning("Could not infer template from pattern: %s", pattern)
         return
