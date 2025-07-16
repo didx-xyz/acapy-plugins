@@ -293,7 +293,7 @@ async def handle_event(profile: Profile, event: EventWithMetadata):
                 event_payload = process_event_payload(
                     event_payload_to_process.enc_payload
                 )
-    if event.topic == "acapy::record::test_wallet_record" and event_payload.get("settings"):
+    if event.topic == "acapy::record::wallet_record" and event_payload.get("settings"):
         # set "wallet.key" in settings to None
         event_payload["settings"]["wallet.key"] = None
 
