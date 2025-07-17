@@ -291,7 +291,7 @@ class DIDCheqdRegistry(BaseAnonCredsResolver, BaseAnonCredsRegistrar):
         """Register a credential definition on the registry."""
         resource_type = CheqdAnonCredsResourceType.credentialDefinition.value
         # TODO: max chars are 31 for resource, on exceeding this should be hashed
-        resource_name = f"{schema.schema_value.name}-{credential_definition.tag}"
+        resource_name = f"{credential_definition.tag}"
 
         cred_def = ResourceCreateRequestOptions(
             options=Options(
