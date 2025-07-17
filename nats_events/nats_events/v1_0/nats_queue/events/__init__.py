@@ -293,9 +293,16 @@ async def handle_event(profile: Profile, event: EventWithMetadata):
                 event_payload = process_event_payload(
                     event_payload_to_process.enc_payload
                 )
-    if event.topic == "acapy::record::wallet_record" and event_payload.get("settings"):
-        # set "wallet.key" in settings to None
-        event_payload["settings"]["wallet.key"] = None
+
+    if event.topic == "acapy::record::wallet_record":
+        if event_payload.get("settings"):
+            # set "wallet.key" in settings to None
+            event_payload["settings"]["wallet.key"] = None
+        else:
+            # dont publish wallet_record event
+            # this is not a create event but looks like an update event
+            # looks like keys being added to the wallet record for connections etc.
+            return
 
     payload = {
         "wallet_id": wallet_id or "base",
