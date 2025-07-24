@@ -15,7 +15,7 @@ LOGGER = logging.getLogger(__name__)
 async def setup(context: InjectionContext):
     """Setup the plugin."""
 
-    LOGGER.info("< cheqd plugin setup...")
+    LOGGER.debug("Starting cheqd plugin setup...")
     config = context.settings.get("plugin_config")
     resolver_url = None
     registrar_url = None
@@ -47,4 +47,4 @@ async def setup(context: InjectionContext):
     did_methods = context.inject_or(DIDMethods)
     did_methods.register(CHEQD)
 
-    LOGGER.info("< cheqd plugin setup.")
+    LOGGER.info("Successfully setup cheqd plugin.")

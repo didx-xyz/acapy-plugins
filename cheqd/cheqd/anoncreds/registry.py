@@ -130,7 +130,7 @@ class DIDCheqdRegistry(BaseAnonCredsResolver, BaseAnonCredsRegistrar):
         """Setup."""
         self.registrar = DIDRegistrar("cheqd", registrar_url)
         self.resolver = CheqdDIDResolver(resolver_url)
-        print("Successfully registered DIDCheqdRegistry")
+        LOGGER.info("Successfully registered DIDCheqdRegistry")
 
     async def get_schema(self, _profile: Profile, schema_id: str) -> GetSchemaResult:
         """Get a schema from the registry."""
