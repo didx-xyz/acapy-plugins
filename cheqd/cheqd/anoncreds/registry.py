@@ -421,14 +421,43 @@ class DIDCheqdRegistry(BaseAnonCredsResolver, BaseAnonCredsRegistrar):
         )
 
         LOGGER.debug("Publishing revocation registry definition resource %s", rev_reg_def)
-        publish_resource_res = await self._create_and_publish_resource(
-            profile,
-            self.registrar.DID_REGISTRAR_BASE_URL,
-            self.resolver.DID_RESOLVER_BASE_URL,
-            rev_reg_def,
-        )
-        revocation_registry_definition_id = publish_resource_res.did_url
-        (_, resource_id) = self.split_did_url(revocation_registry_definition_id)
+        try:
+            publish_resource_res = await self._create_and_publish_resource(
+                profile,
+                self.registrar.DID_REGISTRAR_BASE_URL,
+                self.resolver.DID_RESOLVER_BASE_URL,
+                rev_reg_def,
+            )
+            revocation_registry_definition_id = publish_resource_res.did_url
+            (_, resource_id) = self.split_did_url(revocation_registry_definition_id)
+        except AnonCredsRegistrationError as e:
+            if "Resource already exists" in str(e):
+                LOGGER.debug(
+                    "Resource already exists, fetching existing revocation registry definition"
+                )
+                # Fetch the existing resource using resourceType and resourceName
+                did = revocation_registry_definition.issuer_id
+                query = f"{did}?resourceType={resource_type}&resourceName={resource_name}"
+                resource_with_metadata = await self.resolver.dereference_with_metadata(
+                    profile, query
+                )
+                existing_resource = resource_with_metadata.resource
+                metadata = resource_with_metadata.metadata
+
+                # Get the resource ID from metadata and construct the full resource URI
+                resource_id = metadata.get("resourceId", "")
+                if not resource_id:
+                    raise AnonCredsRegistrationError(
+                        f"Could not determine resource ID of existing resource. Resource with metadata: {metadata}"
+                    )
+                revocation_registry_definition_id = f"{did}/resources/{resource_id}"
+
+                LOGGER.debug(
+                    "Found existing revocation registry definition %s",
+                    revocation_registry_definition_id,
+                )
+            else:
+                raise
 
         result = RevRegDefResult(
             job_id=None,
