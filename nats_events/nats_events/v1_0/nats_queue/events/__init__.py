@@ -297,13 +297,27 @@ async def handle_event(profile: Profile, event: EventWithMetadata):
                 event_payload = process_event_payload(
                     event_payload_to_process.enc_payload
                 )
-    payload = {
-        "wallet_id": wallet_id or "base",
-        "state": event_payload.get("state"),
-        "topic": event.topic,
-        "category": _derive_category(event.topic),
-        "payload": event_payload,
-    }
+
+    if event.topic.startswith("anoncreds::") and "finished" in event.topic:
+        event_payload["state"] = "finished"
+        payload = {
+            "wallet_id": wallet_id or "base",
+            "state": "finished",
+            "topic": event.topic,
+            "category": _derive_category(event.topic),
+            "payload": event_payload,
+        }
+    elif event.topic.startswith("anoncreds::"):
+        return  # Skip other anoncreds events for now
+    else:
+        payload = {
+            "wallet_id": wallet_id or "base",
+            "state": event_payload.get("state"),
+            "topic": event.topic,
+            "category": _derive_category(event.topic),
+            "payload": event_payload,
+        }
+
     try:
         nats_subject = Template(template).substitute(**payload)
 
