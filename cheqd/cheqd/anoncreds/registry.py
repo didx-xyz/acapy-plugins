@@ -453,9 +453,16 @@ class DIDCheqdRegistry(BaseAnonCredsResolver, BaseAnonCredsRegistrar):
                 revocation_registry_definition_id = f"{did}/resources/{resource_id}"
 
                 LOGGER.debug(
-                    "Found existing revocation registry definition %s",
+                    "Found existing revocation registry definition ID, try to fetch: %s.",
                     revocation_registry_definition_id,
                 )
+
+                get_rev_reg_def_result = await self.get_revocation_registry_definition(
+                    profile,
+                    revocation_registry_definition_id,
+                )
+                # Overwrite the revocation registry definition with the existing one
+                revocation_registry_definition = get_rev_reg_def_result.revocation_registry
             else:
                 raise
 
