@@ -266,7 +266,6 @@ async def handle_event(profile: Profile, event: EventWithMetadata):
     pattern = event.metadata.pattern.pattern
     template = config_events.event_topic_maps.get(pattern)
 
-    LOGGER.warning("EVENT:: %s", event)
     if not template:
         LOGGER.warning("Could not infer template from pattern: %s", pattern)
         return
@@ -275,7 +274,7 @@ async def handle_event(profile: Profile, event: EventWithMetadata):
         return  # Skip OutboundMessage types for now
         # event_payload_to_process = process_outbound_message_payload(event.payload)
     else:
-        event_payload_to_process = event.payload
+        event_payload_to_process = serialize_event_payload(event.payload)
 
     js = profile.inject_or(JetStreamContext)
     if not js:
