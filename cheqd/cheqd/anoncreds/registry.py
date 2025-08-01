@@ -1,6 +1,7 @@
 """DID Cheqd AnonCreds Registry."""
 
 import asyncio
+import hashlib
 import logging
 import time
 from datetime import datetime, timezone
@@ -118,11 +119,18 @@ class DIDCheqdRegistry(BaseAnonCredsResolver, BaseAnonCredsRegistrar):
         ids = schema_id.split("/")
         return ids[0], ids[2]
 
+    @staticmethod
+    def _get_resource_name(name: str) -> str:
+        """Get resource name, hashing if it exceeds the limit of 64 characters."""
+        if len(name) > 64:
+            return hashlib.sha256(name.encode()).hexdigest()  # Always 64 characters
+        return name
+
     async def setup(self, _context: InjectionContext, registrar_url, resolver_url):
         """Setup."""
         self.registrar = DIDRegistrar("cheqd", registrar_url)
         self.resolver = CheqdDIDResolver(resolver_url)
-        print("Successfully registered DIDCheqdRegistry")
+        LOGGER.info("Successfully registered DIDCheqdRegistry")
 
     async def get_schema(self, _profile: Profile, schema_id: str) -> GetSchemaResult:
         """Get a schema from the registry."""
@@ -158,7 +166,9 @@ class DIDCheqdRegistry(BaseAnonCredsResolver, BaseAnonCredsRegistrar):
     ) -> SchemaResult:
         """Register a schema on the registry."""
         resource_type = CheqdAnonCredsResourceType.schema.value
-        resource_name = f"{schema.name}"
+
+        # Get resource name and hash if it exceeds 31 characters
+        resource_name = self._get_resource_name(schema.name)
         resource_version = schema.version
         LOGGER.debug("Registering schema %s", schema)
         try:
@@ -290,8 +300,11 @@ class DIDCheqdRegistry(BaseAnonCredsResolver, BaseAnonCredsRegistrar):
     ) -> CredDefResult:
         """Register a credential definition on the registry."""
         resource_type = CheqdAnonCredsResourceType.credentialDefinition.value
-        # TODO: max chars are 31 for resource, on exceeding this should be hashed
-        resource_name = f"{schema.schema_value.name}-{credential_definition.tag}"
+
+        # Generate resource name and hash if it exceeds 31 characters
+        resource_name = self._get_resource_name(
+            f"{schema.schema_value.name}-{credential_definition.tag}"
+        )
 
         cred_def = ResourceCreateRequestOptions(
             options=Options(
@@ -378,13 +391,17 @@ class DIDCheqdRegistry(BaseAnonCredsResolver, BaseAnonCredsRegistrar):
             "Registering revocation registry definition %s",
             revocation_registry_definition,
         )
+        resource_type = CheqdAnonCredsResourceType.revocationRegistryDefinition.value
+
         cred_def_result = await self.get_credential_definition(
             profile, revocation_registry_definition.cred_def_id
         )
         cred_def_res = cred_def_result.credential_definition_metadata.get("resourceName")
-        # TODO: max chars are 31 for resource name, on exceeding this should be hashed
-        resource_name = f"{cred_def_res}-{revocation_registry_definition.tag}"
-        resource_type = CheqdAnonCredsResourceType.revocationRegistryDefinition.value
+
+        # Generate resource name and hash if it exceeds 31 characters
+        resource_name = self._get_resource_name(
+            f"{cred_def_res}-{revocation_registry_definition.tag}"
+        )
 
         rev_reg_def = ResourceCreateRequestOptions(
             options=Options(
@@ -404,14 +421,50 @@ class DIDCheqdRegistry(BaseAnonCredsResolver, BaseAnonCredsRegistrar):
         )
 
         LOGGER.debug("Publishing revocation registry definition resource %s", rev_reg_def)
-        publish_resource_res = await self._create_and_publish_resource(
-            profile,
-            self.registrar.DID_REGISTRAR_BASE_URL,
-            self.resolver.DID_RESOLVER_BASE_URL,
-            rev_reg_def,
-        )
-        revocation_registry_definition_id = publish_resource_res.did_url
-        (_, resource_id) = self.split_did_url(revocation_registry_definition_id)
+        try:
+            publish_resource_res = await self._create_and_publish_resource(
+                profile,
+                self.registrar.DID_REGISTRAR_BASE_URL,
+                self.resolver.DID_RESOLVER_BASE_URL,
+                rev_reg_def,
+            )
+            revocation_registry_definition_id = publish_resource_res.did_url
+            (_, resource_id) = self.split_did_url(revocation_registry_definition_id)
+        except AnonCredsRegistrationError as e:
+            if "Resource already exists" in str(e):
+                LOGGER.debug(
+                    "Resource already exists, fetching existing revocation registry definition"
+                )
+                # Fetch the existing resource using resourceType and resourceName
+                did = revocation_registry_definition.issuer_id
+                query = f"{did}?resourceType={resource_type}&resourceName={resource_name}"
+                resource_with_metadata = await self.resolver.dereference_with_metadata(
+                    profile, query
+                )
+                existing_resource = resource_with_metadata.resource
+                metadata = resource_with_metadata.metadata
+
+                # Get the resource ID from metadata and construct the full resource URI
+                resource_id = metadata.get("resourceId", "")
+                if not resource_id:
+                    raise AnonCredsRegistrationError(
+                        f"Could not determine resource ID of existing resource. Resource with metadata: {metadata}"
+                    )
+                revocation_registry_definition_id = f"{did}/resources/{resource_id}"
+
+                LOGGER.debug(
+                    "Found existing revocation registry definition ID, try to fetch: %s.",
+                    revocation_registry_definition_id,
+                )
+
+                get_rev_reg_def_result = await self.get_revocation_registry_definition(
+                    profile,
+                    revocation_registry_definition_id,
+                )
+                # Overwrite the revocation registry definition with the existing one
+                revocation_registry_definition = get_rev_reg_def_result.revocation_registry
+            else:
+                raise
 
         result = RevRegDefResult(
             job_id=None,
