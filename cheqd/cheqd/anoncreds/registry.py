@@ -583,14 +583,52 @@ class DIDCheqdRegistry(BaseAnonCredsResolver, BaseAnonCredsRegistrar):
             did=rev_reg_def.issuer_id,
         )
 
-        publish_resource_res = await self._create_and_publish_resource(
-            profile,
-            self.registrar.DID_REGISTRAR_BASE_URL,
-            self.resolver.DID_RESOLVER_BASE_URL,
-            rev_status_list,
-        )
-        did_url = publish_resource_res.did_url
-        (_, resource_id) = self.split_did_url(did_url)
+        try:
+            publish_resource_res = await self._create_and_publish_resource(
+                profile,
+                self.registrar.DID_REGISTRAR_BASE_URL,
+                self.resolver.DID_RESOLVER_BASE_URL,
+                rev_status_list,
+            )
+            did_url = publish_resource_res.did_url
+            (_, resource_id) = self.split_did_url(did_url)
+        except AnonCredsRegistrationError as e:
+            if "Resource already exists" in str(e):
+                LOGGER.debug(
+                    "Resource already exists, fetching existing revocation list"
+                )
+                # Fetch the existing resource using resourceType and resourceName
+                did = rev_reg_def.issuer_id
+                query = f"{did}?resourceType={resource_type}&resourceName={resource_name}"
+                resource_with_metadata = await self.resolver.dereference_with_metadata(
+                    profile, query
+                )
+                existing_resource = resource_with_metadata.resource
+                metadata = resource_with_metadata.metadata
+
+                # Get the resource ID from metadata and construct the full resource URI
+                resource_id = metadata.get("resourceId", "")
+                if not resource_id:
+                    raise AnonCredsRegistrationError(
+                        f"Could not determine resource ID of existing resource. Resource with metadata: {metadata}"
+                    )
+                did_url = f"{did}/resources/{resource_id}"
+
+                LOGGER.debug(
+                    "Found existing revocation list ID: %s.",
+                    did_url,
+                )
+
+                # Create RevList object from the existing resource
+                rev_list = RevList(
+                    issuer_id=did,
+                    rev_reg_def_id=rev_reg_def_id,
+                    revocation_list=existing_resource.get("revocationList"),
+                    current_accumulator=existing_resource.get("currentAccumulator"),
+                    timestamp=int(time.time()),  # Use current timestamp for existing resource
+                )
+            else:
+                raise
 
         result = RevListResult(
             job_id=None,
