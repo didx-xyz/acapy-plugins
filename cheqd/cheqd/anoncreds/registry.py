@@ -462,7 +462,9 @@ class DIDCheqdRegistry(BaseAnonCredsResolver, BaseAnonCredsRegistrar):
                     revocation_registry_definition_id,
                 )
                 # Overwrite the revocation registry definition with the existing one
-                revocation_registry_definition = get_rev_reg_def_result.revocation_registry
+                revocation_registry_definition = (
+                    get_rev_reg_def_result.revocation_registry
+                )
             else:
                 raise
 
