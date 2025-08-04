@@ -183,9 +183,6 @@ def _derive_category(topic: str):
         return "webhook"
     if MESSAGE_RE.match(topic):
         return "basicmessage"
-    anon_match = ANONCREDS_RE.match(topic)
-    if anon_match:
-        return anon_match.group(1)
 
 def process_event_payload(event_payload: Any):
     """Process event payload."""
@@ -298,17 +295,20 @@ async def handle_event(profile: Profile, event: EventWithMetadata):
                     event_payload_to_process.enc_payload
                 )
 
-    if event.topic.startswith("anoncreds::") and "finished" in event.topic:
-        event_payload["state"] = "finished"
-        payload = {
-            "wallet_id": wallet_id or "base",
-            "state": "finished",
-            "topic": event.topic,
-            "category": _derive_category(event.topic),
-            "payload": event_payload,
-        }
-    elif event.topic.startswith("anoncreds::"):
-        return  # Skip other anoncreds events for now
+    if event.topic.startswith("anoncreds::"):
+        anon_match = ANONCREDS_RE.match(event.topic)
+        if anon_match:
+            event_payload["state"] = anon_match.group(2)
+            payload = {
+                "wallet_id": wallet_id or "base",
+                "state": anon_match.group(2),
+                "topic": event.topic,
+                "category": anon_match.group(1),
+                "payload": event_payload,
+            }
+        else:
+            LOGGER.warning("Could not derive anoncreds category from topic: %s", event.topic)
+
     else:
         payload = {
             "wallet_id": wallet_id or "base",
