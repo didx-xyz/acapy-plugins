@@ -433,7 +433,7 @@ class DIDCheqdRegistry(BaseAnonCredsResolver, BaseAnonCredsRegistrar):
         except AnonCredsRegistrationError as e:
             if "Resource already exists" in str(e):
                 LOGGER.debug(
-                    "Resource already exists, fetching existing revocation registry definition"
+                    "Resource already exists, fetching existing revocation registry definition"  # noqa: E501
                 )
                 # Fetch the existing resource using resourceType and resourceName
                 did = revocation_registry_definition.issuer_id
@@ -441,14 +441,14 @@ class DIDCheqdRegistry(BaseAnonCredsResolver, BaseAnonCredsRegistrar):
                 resource_with_metadata = await self.resolver.dereference_with_metadata(
                     profile, query
                 )
-                existing_resource = resource_with_metadata.resource
                 metadata = resource_with_metadata.metadata
 
                 # Get the resource ID from metadata and construct the full resource URI
                 resource_id = metadata.get("resourceId", "")
                 if not resource_id:
                     raise AnonCredsRegistrationError(
-                        f"Could not determine resource ID of existing resource. Resource with metadata: {metadata}"
+                        f"Could not determine resource ID of existing resource. "
+                        f"Resource with metadata: {metadata}"
                     )
                 revocation_registry_definition_id = f"{did}/resources/{resource_id}"
 
@@ -594,9 +594,7 @@ class DIDCheqdRegistry(BaseAnonCredsResolver, BaseAnonCredsRegistrar):
             (_, resource_id) = self.split_did_url(did_url)
         except AnonCredsRegistrationError as e:
             if "Resource already exists" in str(e):
-                LOGGER.debug(
-                    "Resource already exists, fetching existing revocation list"
-                )
+                LOGGER.debug("Resource already exists, fetching existing revocation list")
                 # Fetch the existing resource using resourceType and resourceName
                 did = rev_reg_def.issuer_id
                 query = f"{did}?resourceType={resource_type}&resourceName={resource_name}"
@@ -610,7 +608,8 @@ class DIDCheqdRegistry(BaseAnonCredsResolver, BaseAnonCredsRegistrar):
                 resource_id = metadata.get("resourceId", "")
                 if not resource_id:
                     raise AnonCredsRegistrationError(
-                        f"Could not determine resource ID of existing resource. Resource with metadata: {metadata}"
+                        f"Could not determine resource ID of existing resource. "
+                        f"Resource with metadata: {metadata}"
                     )
                 did_url = f"{did}/resources/{resource_id}"
 
@@ -625,7 +624,7 @@ class DIDCheqdRegistry(BaseAnonCredsResolver, BaseAnonCredsRegistrar):
                     rev_reg_def_id=rev_reg_def_id,
                     revocation_list=existing_resource.get("revocationList"),
                     current_accumulator=existing_resource.get("currentAccumulator"),
-                    timestamp=int(time.time()),  # Use current timestamp for existing resource
+                    timestamp=int(time.time()),  # Use current time for existing resource
                 )
             else:
                 raise
