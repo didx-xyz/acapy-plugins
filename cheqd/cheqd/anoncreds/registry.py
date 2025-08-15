@@ -432,7 +432,7 @@ class DIDCheqdRegistry(BaseAnonCredsResolver, BaseAnonCredsRegistrar):
             (_, resource_id) = self.split_did_url(revocation_registry_definition_id)
         except AnonCredsRegistrationError as e:
             if "Resource already exists" in str(e):
-                LOGGER.debug(
+                LOGGER.info(
                     "Resource already exists, fetching existing revocation registry definition"  # noqa: E501
                 )
                 # Fetch the existing resource using resourceType and resourceName
@@ -452,7 +452,7 @@ class DIDCheqdRegistry(BaseAnonCredsResolver, BaseAnonCredsRegistrar):
                     )
                 revocation_registry_definition_id = f"{did}/resources/{resource_id}"
 
-                LOGGER.debug(
+                LOGGER.info(
                     "Found existing revocation registry definition ID, try to fetch: %s.",
                     revocation_registry_definition_id,
                 )
@@ -594,7 +594,7 @@ class DIDCheqdRegistry(BaseAnonCredsResolver, BaseAnonCredsRegistrar):
             (_, resource_id) = self.split_did_url(did_url)
         except AnonCredsRegistrationError as e:
             if "Resource already exists" in str(e):
-                LOGGER.debug("Resource already exists, fetching existing revocation list")
+                LOGGER.info("Resource already exists, fetching existing revocation list")
                 # Fetch the existing resource using resourceType and resourceName
                 did = rev_reg_def.issuer_id
                 query = f"{did}?resourceType={resource_type}&resourceName={resource_name}"
@@ -613,9 +613,9 @@ class DIDCheqdRegistry(BaseAnonCredsResolver, BaseAnonCredsRegistrar):
                     )
                 did_url = f"{did}/resources/{resource_id}"
 
-                LOGGER.debug(
+                LOGGER.info(
                     "Found existing revocation list ID: %s.",
-                    did_url,
+                    did_url
                 )
 
                 # Create RevList object from the existing resource
