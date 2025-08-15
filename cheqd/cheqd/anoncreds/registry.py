@@ -432,7 +432,7 @@ class DIDCheqdRegistry(BaseAnonCredsResolver, BaseAnonCredsRegistrar):
             (_, resource_id) = self.split_did_url(revocation_registry_definition_id)
         except AnonCredsRegistrationError as e:
             if "Resource already exists" in str(e):
-                LOGGER.info(
+                LOGGER.warning(
                     "Resource already exists, fetching existing revocation registry definition"  # noqa: E501
                 )
                 # Fetch the existing resource using resourceType and resourceName
@@ -594,7 +594,7 @@ class DIDCheqdRegistry(BaseAnonCredsResolver, BaseAnonCredsRegistrar):
             (_, resource_id) = self.split_did_url(did_url)
         except AnonCredsRegistrationError as e:
             if "Resource already exists" in str(e):
-                LOGGER.info("Resource already exists, fetching existing revocation list")
+                LOGGER.warning("Resource already exists, fetching existing revocation list")
                 # Fetch the existing resource using resourceType and resourceName
                 did = rev_reg_def.issuer_id
                 query = f"{did}?resourceType={resource_type}&resourceName={resource_name}"
