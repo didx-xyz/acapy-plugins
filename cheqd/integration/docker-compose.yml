@@ -12,6 +12,27 @@ services:
         condition: service_healthy
       holder:
         condition: service_healthy
+      valkey:
+        condition: service_healthy
+
+  valkey:
+    image: valkey/valkey:8-alpine
+    container_name: valkey-primary
+    ports:
+      - "6379:6379"
+    command: >
+      valkey-server
+      --save ""
+      --appendonly no
+      --protected-mode no
+      --bind 0.0.0.0
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
 
   issuer:
     build:
@@ -51,7 +72,7 @@ services:
       - did_registrar
       - did_resolver
       - tails
-      
+
   holder:
     build:
       context: ../
