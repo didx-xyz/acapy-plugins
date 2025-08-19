@@ -34,7 +34,7 @@ services:
       --wallet-key insecure
       --wallet-allow-insecure-seed
       --auto-provision
-      --log-level info
+      --log-level debug
       --debug-webhooks
       --no-ledger
       --public-invites
@@ -71,7 +71,7 @@ services:
         --wallet-name holder
         --wallet-key insecure
         --auto-provision
-        --log-level info
+        --log-level debug
         --debug-webhooks
         --no-ledger
         --public-invites
