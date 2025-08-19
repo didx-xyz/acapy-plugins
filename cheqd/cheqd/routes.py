@@ -34,6 +34,16 @@ class CustomDIDEndpointWithTypeSchema(DIDEndpointWithTypeSchema):
     )
 
 
+class CustomDIDEndpointWithTypeSchema(DIDEndpointWithTypeSchema):
+    """Schema for setting Cheqd DID endpoint with type."""
+
+    did = fields.Str(
+        required=True,
+        validate=CHEQD_DID_VALIDATE,
+        metadata={"description": "DID of interest", "example": CHEQD_DID_EXAMPLE},
+    )
+
+
 class VerificationMethodSchema(Schema):
     """VerificationMethod Schema."""
 
