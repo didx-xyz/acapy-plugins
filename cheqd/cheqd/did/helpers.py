@@ -182,6 +182,6 @@ def create_did_payload(
         "controller": [key["didUrl"] for key in verification_keys],
         "verificationMethod": verification_methods,
         "authentication": [key["keyId"] for key in verification_keys],
-        "assertionMethod": keys,
+        # "assertionMethod": keys,
         # "service": [service],
     }

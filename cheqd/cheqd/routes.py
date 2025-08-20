@@ -378,12 +378,9 @@ async def create_cheqd_did(request: web.BaseRequest):
         result = await CheqdDIDManager(profile, registrar_url, resolver_url).create(
             body.get("didDocument"), body.get("options")
         )
-
-        verkey = result.get("verkey")
-        route_manager = profile.inject(RouteManager)
-        await route_manager.route_verkey(profile, verkey)
-
-        return web.json_response({"did": result.get("did"), "verkey": verkey})
+        return web.json_response(
+            {"did": result.get("did"), "verkey": result.get("verkey")}
+        )
     except CheqdDIDManagerError as err:
         LOGGER.error("Error creating Cheqd DID: %s", err.roll_up)
         raise web.HTTPInternalServerError(reason=err.roll_up)
