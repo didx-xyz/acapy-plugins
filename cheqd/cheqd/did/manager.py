@@ -94,6 +94,7 @@ class CheqdDIDManager(BaseDIDManager):
                     did_document, verkey, kid = await self._prepare_did_document(
                         wallet, did_doc, options, network, key_type, seed
                     )
+                    LOGGER.info("Publishing DID document: %s", did_document)
                     return await self._create_and_publish_did(
                         wallet, did_document, network, verkey, kid
                     )
@@ -237,6 +238,7 @@ class CheqdDIDManager(BaseDIDManager):
 
                 # TODO If registrar supports other operation,
                 #       take didDocumentOperation as input
+                LOGGER.info("Updating DID %s", did_doc)
                 update_request_res = await self.registrar.update(
                     DidUpdateRequestOptions(
                         did=did,
@@ -279,7 +281,7 @@ class CheqdDIDManager(BaseDIDManager):
                     raise CheqdDIDManagerError(f"Error updating DID: {message}")
             # TODO update new keys to wallet if necessary
             except Exception as ex:
-                LOGGER.error("Exception occurred during DID update: %s", str(ex))
+                LOGGER.exception("Exception occurred during DID update: %s", str(ex))
                 raise ex
 
         return {"did": did, "didDocument": publish_did_state.didDocument.model_dump()}

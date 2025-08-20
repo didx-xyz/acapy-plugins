@@ -488,7 +488,7 @@ async def cheqd_wallet_set_did_endpoint(request: web.BaseRequest):
         return web.json_response({"result": result})
 
     except Exception as err:
-        raise web.HTTPBadRequest(reason=str(err))
+        raise web.HTTPBadRequest(reason=str(err).replace("\n", ". "))
 
 
 @docs(
