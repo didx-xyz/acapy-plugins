@@ -303,6 +303,112 @@ async def test_import_did_web_method():
 
 
 @pytest.mark.asyncio
+async def test_create_cheqd_did_and_didexchange():
+    """Test creating a cheqd DID and using it for didexchange."""
+    async with (
+        Controller(base_url=ISSUER) as issuer,
+        Controller(base_url=HOLDER) as holder,
+    ):
+        # Step 1: Create a new cheqd DID using the create endpoint
+        create_did_response = await issuer.post(
+            "/did/cheqd/create",
+            json={"options": {"network": "testnet", "key_type": "ed25519"}},
+        )
+
+        # Verify DID creation response
+        assert "did" in create_did_response, "DID should be present in response"
+        assert "verkey" in create_did_response, (
+            "Verification key should be present in response"
+        )
+
+        created_did = create_did_response["did"]
+        assert created_did.startswith("did:cheqd:testnet:"), (
+            "Created DID should be a cheqd testnet DID"
+        )
+        print(f"Step 1 completed: cheqd DID created successfully: {created_did}")
+
+        # Step 2: Set the created DID as public DID for issuer
+        public_did_response = await issuer.post(f"/wallet/did/public?did={created_did}")
+        assert public_did_response["result"]["did"] == created_did, (
+            "Public DID should match created DID"
+        )
+        print(f"Step 2 completed: Created cheqd DID {created_did} set as public DID")
+
+        # Step 3: Holder creates connection invitation using the public cheqd DID
+        invitation_response = await holder.post(
+            "/didexchange/create-request",
+            params={
+                "their_public_did": created_did,
+                "alias": "Holder-to-CreatedIssuer",
+                "auto_accept": "true",
+                "my_endpoint": "http://holder:4002",
+                "my_label": "Holder-using-created-public-did",
+            },
+        )
+        connection_id_holder = invitation_response["connection_id"]
+
+        # Verify invitation contains the created cheqd DID
+        assert invitation_response.get("state") == "request", (
+            "Invitation should be in 'request' state"
+        )
+        assert invitation_response.get("their_public_did") == created_did, (
+            "Invitation should contain the created cheqd public DID"
+        )
+        assert invitation_response.get("alias") == "Holder-to-CreatedIssuer", (
+            "Invitation alias should match"
+        )
+        await asyncio.sleep(3)
+
+        # Step 4: Issuer checks for incoming connection request
+        connections = await issuer.get(
+            "/connections?descending=false&limit=100&offset=0&order_by=id&state=request"
+        )
+        assert len(connections["results"]) > 0, "No connection requests found"
+        connection_id_issuer = connections["results"][0]["connection_id"]
+
+        # Step 5: Issuer accepts invitation
+        receive_response = await issuer.post(
+            f"/didexchange/{connection_id_issuer}/accept-request",
+            json={
+                "my_endpoint": "http://issuer:3002",
+                "use_public_did": False,
+            },
+        )
+        assert receive_response["state"] == "response", (
+            "Connection should be response after accepting request"
+        )
+        await asyncio.sleep(3)
+
+        # Step 6: Verify connection status on both sides
+        issuer_connection = await issuer.get(f"/connections/{connection_id_issuer}")
+        assert issuer_connection["state"] == "active", (
+            "Issuer connection should be active after accepting request"
+        )
+        assert issuer_connection["connection_protocol"] == "didexchange/1.0", (
+            "Connection protocol should be didexchange/1.0"
+        )
+        assert issuer_connection["rfc23_state"] == "completed", (
+            "Connection should be in completed state"
+        )
+        assert issuer_connection["their_label"] == "Holder-using-created-public-did", (
+            "Connection label should match holder's label"
+        )
+
+        holder_connection = await holder.get(f"/connections/{connection_id_holder}")
+        assert holder_connection["state"] == "active", (
+            "Holder connection should be active after accepting the request"
+        )
+        assert holder_connection["their_public_did"] == created_did, (
+            "Holder connection should reference the created public DID"
+        )
+
+        print(
+            "Step 3 completed: DID Exchange completed successfully with created cheqd DID"
+        )
+        print(f"Created and used cheqd DID: {created_did}")
+
+
+@pytest.mark.asyncio
 async def test_cheqd_did_end_to_end_workflow():
     """Test complete workflow for did:cheqd: import, verify, use."""
     # Define test DID attributes
