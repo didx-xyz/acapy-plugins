@@ -7,6 +7,7 @@ from acapy_agent.admin.decorators.auth import tenant_authentication
 from acapy_agent.admin.request_context import AdminRequestContext
 from acapy_agent.ledger.base import EndpointType
 from acapy_agent.messaging.models.openapi import OpenAPISchema
+from acapy_agent.protocols.coordinate_mediation.v1_0.route_manager import RouteManager
 from acapy_agent.wallet.error import WalletError
 from acapy_agent.wallet.routes import (
     DIDEndpointWithTypeSchema,
@@ -367,9 +368,14 @@ async def create_cheqd_did(request: web.BaseRequest):
         result = await CheqdDIDManager(profile, registrar_url, resolver_url).create(
             body.get("didDocument"), body.get("options")
         )
-        return web.json_response(
-            {"did": result.get("did"), "verkey": result.get("verkey")}
-        )
+        did = result.get("did")
+        verkey = result.get("verkey")
+
+        route_manager = profile.inject(RouteManager)
+        await route_manager.route_verkey(profile, verkey)
+
+        LOGGER.info(f"Created DID: {did} with verkey: {verkey}")
+        return web.json_response({"did": did, "verkey": verkey})
     except CheqdDIDManagerError as err:
         LOGGER.error("Error creating Cheqd DID: %s", err.roll_up)
         raise web.HTTPInternalServerError(reason=err.roll_up)
