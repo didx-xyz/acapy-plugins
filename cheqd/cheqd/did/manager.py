@@ -203,7 +203,13 @@ class CheqdDIDManager(BaseDIDManager):
                 message = self._get_error_message(publish_did_state)
                 raise CheqdDIDManagerError(f"Error registering DID: {message}")
 
-            await wallet.create_public_did(CHEQD, ED25519, None, did_document["id"])
+            await wallet.create_public_did(
+                CHEQD,
+                ED25519,
+                seed=None,
+                did=did_document["id"],
+                metadata={"verkey": verkey},
+            )
             await wallet.assign_kid_to_key(verkey, kid)
             return {
                 "did": did_document["id"],

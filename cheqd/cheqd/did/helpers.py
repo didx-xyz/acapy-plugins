@@ -165,10 +165,11 @@ def create_did_payload(
     keys = [f"{did}#key-1"]
     service = (
         {
-            "id": f"{did}#service-1",
+            "id": f"{did}#did-communication",
             "type": "did-communication",
             "serviceEndpoint": [endpoint],
             "recipientKeys": keys,
+            "priority": 1,
         }
         if endpoint
         else None
@@ -182,6 +183,6 @@ def create_did_payload(
         "controller": [key["didUrl"] for key in verification_keys],
         "verificationMethod": verification_methods,
         "authentication": [key["keyId"] for key in verification_keys],
-        # "assertionMethod": keys,
-        # "service": [service],
+        "assertionMethod": keys,
+        "service": [service],
     }
