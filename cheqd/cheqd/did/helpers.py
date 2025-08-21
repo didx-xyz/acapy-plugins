@@ -149,6 +149,7 @@ def create_did_verification_method(
 def create_did_payload(
     verification_methods: List[VerificationMethod],
     verification_keys: List[IVerificationKeys],
+    endpoint: str,
 ) -> DIDDocument:
     """Construct DID Document."""
     if not verification_methods:
@@ -157,9 +158,25 @@ def create_did_payload(
         raise ValueError("No verification keys provided")
 
     did = verification_keys[0]["didUrl"]
+
+    keys = [f"{did}#key-1"]
+    service = (
+        {
+            "id": f"{did}#did-communication",
+            "type": "did-communication",
+            "serviceEndpoint": [endpoint],
+            "recipientKeys": keys,
+            "priority": 1,
+        }
+        if endpoint
+        else None
+    )
+
     return {
         "id": did,
         "controller": [key["didUrl"] for key in verification_keys],
         "verificationMethod": verification_methods,
         "authentication": [key["keyId"] for key in verification_keys],
+        "assertionMethod": keys,
+        "service": [service],
     }

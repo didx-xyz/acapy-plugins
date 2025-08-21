@@ -91,7 +91,7 @@ class CheqdDIDManager(BaseDIDManager):
                 verkey = key.verkey
                 verkey_bytes = b58_to_bytes(verkey)
                 public_key_b64 = bytes_to_b64(verkey_bytes)
-                verification_method = VerificationMethods.Ed255192020
+                verification_method = VerificationMethods.Ed255192018
                 if options.get("verification_method"):
                     verification_method = VerificationMethods(
                         options.get("verification_method")
@@ -104,7 +104,9 @@ class CheqdDIDManager(BaseDIDManager):
                         [verification_method], [verification_keys]
                     )
                     did_document = create_did_payload(
-                        verification_methods, [verification_keys]
+                        verification_methods,
+                        [verification_keys],
+                        endpoint=self.profile.settings.get("default_endpoint"),
                     )
                 else:
                     did_document = did_doc
