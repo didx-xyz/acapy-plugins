@@ -52,14 +52,14 @@ DIDDocument = Dict[str, Union[str, List[str], List[VerificationMethod]]]
 
 def create_verification_keys(
     public_key_b64: str,
-    network: CheqdNetwork = CheqdNetwork.Testnet,
+    network: str = CheqdNetwork.Testnet.value,
     algo: MethodSpecificIdAlgo = MethodSpecificIdAlgo.Uuid,
     key: TVerificationKey = "key-1",
 ) -> IVerificationKeys:
     """Construct a verification key from a public key."""
     if algo == MethodSpecificIdAlgo.Base58:
         method_specific_id = bytes_to_b58(b64_to_bytes(public_key_b64))
-        did_url = f"did:cheqd:{network.value}:{
+        did_url = f"did:cheqd:{network}:{
             multibase.encode(
                 sha256(b64_to_bytes(public_key_b64)).digest()[:16], 'base58btc'
             )[1:]

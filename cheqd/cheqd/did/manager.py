@@ -13,7 +13,7 @@ from acapy_agent.wallet.did_info import DIDInfo
 from acapy_agent.wallet.did_method import DIDMethods
 from acapy_agent.wallet.did_parameters_validation import DIDParametersValidation
 from acapy_agent.wallet.error import WalletError
-from acapy_agent.wallet.key_type import BLS12381G2, ED25519, P256
+from acapy_agent.wallet.key_type import BLS12381G2, ED25519, KeyType, P256
 from acapy_agent.wallet.keys.manager import multikey_to_verkey
 from acapy_agent.wallet.routes import format_did_info
 from acapy_agent.wallet.util import b58_to_bytes, bytes_to_b64
@@ -119,7 +119,7 @@ class CheqdDIDManager(BaseDIDManager):
                     LOGGER.error("Unexpected error during DID creation: %s", str(ex))
                     raise CheqdDIDManagerError(str(ex))
 
-    def _validate_seed(self, options: dict) -> str:
+    def _validate_seed(self, options: dict) -> str | None:
         """Validate and return the seed."""
         seed = options.get("seed")
         if seed and not self.profile.settings.get("wallet.allow_insecure_seed"):
@@ -130,11 +130,11 @@ class CheqdDIDManager(BaseDIDManager):
     async def _prepare_did_document(
         self,
         wallet: BaseWallet,
-        did_doc: DIDDocumentSchema,
+        did_doc: DIDDocumentSchema | None,
         options: dict,
         network: str,
-        key_type: str,
-        seed: str,
+        key_type: KeyType,
+        seed: str | None,
     ) -> Tuple[DIDDocumentSchema, str, str]:
         """Prepare the DID document and return it along with verkey and kid."""
         key = await wallet.create_key(key_type, seed)
