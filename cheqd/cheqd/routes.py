@@ -7,7 +7,6 @@ from acapy_agent.admin.decorators.auth import tenant_authentication
 from acapy_agent.admin.request_context import AdminRequestContext
 from acapy_agent.ledger.base import EndpointType
 from acapy_agent.messaging.models.openapi import OpenAPISchema
-from acapy_agent.protocols.coordinate_mediation.v1_0.route_manager import RouteManager
 from acapy_agent.wallet.error import WalletError
 from acapy_agent.wallet.routes import (
     DIDEndpointWithTypeSchema,
@@ -22,16 +21,6 @@ from .did.manager import CheqdDIDManager, CheqdDIDManagerError
 from .validation import CHEQD_DID_EXAMPLE, CHEQD_DID_VALIDATE, CHEQD_DIDSTATE_EXAMPLE
 
 LOGGER = logging.getLogger(__name__)
-
-
-class CustomDIDEndpointWithTypeSchema(DIDEndpointWithTypeSchema):
-    """Schema for setting Cheqd DID endpoint with type."""
-
-    did = fields.Str(
-        required=True,
-        validate=CHEQD_DID_VALIDATE,
-        metadata={"description": "DID of interest", "example": CHEQD_DID_EXAMPLE},
-    )
 
 
 class CustomDIDEndpointWithTypeSchema(DIDEndpointWithTypeSchema):
