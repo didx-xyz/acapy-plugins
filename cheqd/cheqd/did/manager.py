@@ -6,6 +6,7 @@ from typing import Optional, Tuple
 
 from acapy_agent.core.profile import Profile
 from acapy_agent.ledger.base import EndpointType
+from acapy_agent.protocols.coordinate_mediation.v1_0.route_manager import RouteManager
 from acapy_agent.resolver.base import DIDNotFound
 from acapy_agent.wallet.base import BaseWallet
 from acapy_agent.wallet.crypto import validate_seed
@@ -296,6 +297,10 @@ class CheqdDIDManager(BaseDIDManager):
                         multibase = vm.get("publicKeyMultibase")
                         if multibase:
                             verkey = multikey_to_verkey(multibase)
+                    else:
+                        LOGGER.error(
+                            "Unsupported verification method type: %s", vm.get("type")
+                        )
 
                     if verkey:
                         LOGGER.info("Updating routing for verkey: %s", verkey)
@@ -310,11 +315,15 @@ class CheqdDIDManager(BaseDIDManager):
                                 await wallet.set_public_did(updated_did_info)
 
                             # Update routing
-                            from acapy_agent.protocols.coordinate_mediation.v1_0.route_manager import RouteManager
                             route_manager = self.profile.inject(RouteManager)
                             await route_manager.route_verkey(self.profile, verkey)
                         except Exception as e:
-                            LOGGER.warning("Failed to update verkey in wallet: %s", e)
+                            LOGGER.error("Failed to update verkey in wallet: %s", e)
+
+                    else:
+                        LOGGER.error(
+                            "No verkey found for verification method: %s", vm
+                        )
 
             except Exception as ex:
                 LOGGER.error("Exception occurred during DID update: %s", str(ex))
