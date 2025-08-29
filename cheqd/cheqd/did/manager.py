@@ -283,7 +283,39 @@ class CheqdDIDManager(BaseDIDManager):
                     LOGGER.error("Error updating DID: %s", did_state)
                     message = self._get_error_message(did_state)
                     raise CheqdDIDManagerError(f"Error updating DID: {message}")
-            # TODO update new keys to wallet if necessary
+
+                # Update new keys to wallet if necessary
+                verification_methods = did_doc.get("verificationMethod", [])
+                if verification_methods:
+                    vm = verification_methods[0]  # Assume first verification method
+
+                    verkey = None
+                    if vm.get("type") == "Ed25519VerificationKey2018":
+                        verkey = vm.get("publicKeyBase58")
+                    elif vm.get("type") == "Ed25519VerificationKey2020":
+                        multibase = vm.get("publicKeyMultibase")
+                        if multibase:
+                            verkey = multikey_to_verkey(multibase)
+
+                    if verkey:
+                        LOGGER.info("Updating routing for verkey: %s", verkey)
+                        try:
+                            # Update the DID's verkey with automatic KID reassignment
+                            updated_did_info = await wallet.update_local_did_verkey(did, verkey)
+                            LOGGER.debug("Updated DID info: %s", updated_did_info)
+
+                            # Update public DID if this is the current public DID
+                            public_did = await wallet.get_public_did()
+                            if public_did and public_did.did == did:
+                                await wallet.set_public_did(updated_did_info)
+
+                            # Update routing
+                            from acapy_agent.protocols.coordinate_mediation.v1_0.route_manager import RouteManager
+                            route_manager = self.profile.inject(RouteManager)
+                            await route_manager.route_verkey(self.profile, verkey)
+                        except Exception as e:
+                            LOGGER.warning("Failed to update verkey in wallet: %s", e)
+
             except Exception as ex:
                 LOGGER.error("Exception occurred during DID update: %s", str(ex))
                 raise ex
