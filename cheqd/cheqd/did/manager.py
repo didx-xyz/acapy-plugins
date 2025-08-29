@@ -142,7 +142,7 @@ class CheqdDIDManager(BaseDIDManager):
         verkey_bytes = b58_to_bytes(verkey)
         public_key_b64 = bytes_to_b64(verkey_bytes)
         verification_method = (
-            options.get("verification_method") or VerificationMethods.Ed255192018
+            options.get("verification_method") or VerificationMethods.Ed255192020
         )
 
         if did_doc is None:
