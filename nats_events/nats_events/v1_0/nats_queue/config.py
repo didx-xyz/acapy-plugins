@@ -23,6 +23,7 @@ EVENT_TOPIC_MAP = {
     "acapy::revocation-notification-v2::received": "acapy.revocation-notification-v2.received",  # noqa: E501
     "acapy::forward::received": "acapy.forward.received",
     "acapy::outbound-message::queued_for_delivery": "acapy.outbound-message.queued-for-delivery",  # noqa: E501
+    "^anoncreds::([^:]*)::([^:]*)$": "anoncreds.record-with-state.$wallet_id",
 }
 
 EVENT_WEBHOOK_TOPIC_MAP = {
