@@ -1,12 +1,16 @@
 """Helpers for did:cheqd."""
 
+import logging
 from enum import Enum
 from hashlib import sha256
 from typing import Dict, List, Union
 from uuid import uuid4
 
-from acapy_agent.wallet.util import b64_to_bytes, bytes_to_b58, bytes_to_b64
 from acapy_agent.utils.multiformats import multibase, multicodec
+from acapy_agent.wallet.util import b64_to_bytes, bytes_to_b58, bytes_to_b64
+from base58 import b58encode
+
+logger = logging.getLogger(__name__)
 
 
 class CheqdNetwork(Enum):
@@ -48,14 +52,14 @@ DIDDocument = Dict[str, Union[str, List[str], List[VerificationMethod]]]
 
 def create_verification_keys(
     public_key_b64: str,
-    network: CheqdNetwork = CheqdNetwork.Testnet,
+    network: str = CheqdNetwork.Testnet.value,
     algo: MethodSpecificIdAlgo = MethodSpecificIdAlgo.Uuid,
     key: TVerificationKey = "key-1",
 ) -> IVerificationKeys:
     """Construct a verification key from a public key."""
     if algo == MethodSpecificIdAlgo.Base58:
         method_specific_id = bytes_to_b58(b64_to_bytes(public_key_b64))
-        did_url = f"did:cheqd:{network.value}:{
+        did_url = f"did:cheqd:{network}:{
             multibase.encode(
                 sha256(b64_to_bytes(public_key_b64)).digest()[:16], 'base58btc'
             )[1:]
@@ -119,12 +123,14 @@ def create_did_verification_method(
                 }
             )
         elif type_ == VerificationMethods.Ed255192018:
+            public_key_bytes = b64_to_bytes(key["publicKey"])
+            public_key_base58 = b58encode(public_key_bytes).decode()
             methods.append(
                 {
                     "id": key["keyId"],
                     "type": type_.value,
                     "controller": key["didUrl"],
-                    "publicKeyBase58": key["methodSpecificId"][1:],
+                    "publicKeyBase58": public_key_base58,
                 }
             )
         elif type_ == VerificationMethods.JWK:
@@ -146,6 +152,7 @@ def create_did_verification_method(
 def create_did_payload(
     verification_methods: List[VerificationMethod],
     verification_keys: List[IVerificationKeys],
+    endpoint: str,
 ) -> DIDDocument:
     """Construct DID Document."""
     if not verification_methods:
@@ -154,9 +161,28 @@ def create_did_payload(
         raise ValueError("No verification keys provided")
 
     did = verification_keys[0]["didUrl"]
+
+    keys = [f"{did}#key-1"]
+    service = (
+        {
+            "id": f"{did}#did-communication",
+            "type": "did-communication",
+            "serviceEndpoint": [endpoint],
+            "recipientKeys": keys,
+            "priority": 1,
+        }
+        if endpoint
+        else None
+    )
+
+    if not service:
+        logger.info("No endpoint provided, did communication service not added")
+
     return {
         "id": did,
         "controller": [key["didUrl"] for key in verification_keys],
         "verificationMethod": verification_methods,
         "authentication": [key["keyId"] for key in verification_keys],
+        "assertionMethod": keys,
+        "service": [service],
     }

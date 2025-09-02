@@ -2,9 +2,7 @@ import time
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from acapy_agent.anoncreds.base import (
-    AnonCredsRegistrationError,
-)
+from acapy_agent.anoncreds.base import AnonCredsRegistrationError
 from acapy_agent.anoncreds.models.credential_definition import (
     CredDefResult,
     GetCredDefResult,
@@ -12,23 +10,23 @@ from acapy_agent.anoncreds.models.credential_definition import (
 from acapy_agent.anoncreds.models.revocation import (
     GetRevListResult,
     GetRevRegDefResult,
-    RevRegDefResult,
     RevListResult,
+    RevRegDefResult,
 )
 from acapy_agent.anoncreds.models.schema import GetSchemaResult, SchemaResult
 from acapy_agent.anoncreds.models.schema_info import AnonCredsSchemaInfo
 
 from ...did.base import (
+    Options,
     ResourceCreateRequestOptions,
     ResourceUpdateRequestOptions,
-    Options,
 )
 from ...did.manager import CheqdDIDManager
 from ...did.tests.mocks import (
-    registrar_resource_responses_no_signing_request,
-    setup_mock_registrar,
     registrar_resource_responses_network_fail,
+    registrar_resource_responses_no_signing_request,
     registrar_resource_responses_not_finished,
+    setup_mock_registrar,
 )
 from ...validation import CHEQD_DID_VALIDATE
 from ..registry import DIDCheqdRegistry
@@ -664,3 +662,33 @@ async def test_create_not_finished(
     # Assert
     assert isinstance(e.value, AnonCredsRegistrationError)
     assert str(e.value) == "Error publishing Resource Not finished"
+
+
+def test_get_resource_name():
+    """Test _get_resource_name method with different name lengths."""
+    # Short name (under 64 characters)
+    short_name = "test_schema"
+    result = DIDCheqdRegistry._get_resource_name(short_name)
+    assert result == short_name
+
+    # Exactly 64 characters
+    exact_64_name = "a" * 64
+    result = DIDCheqdRegistry._get_resource_name(exact_64_name)
+    assert result == exact_64_name
+    assert len(result) == 64
+
+    # Over 64 characters - should be hashed
+    long_name = "a" * 65
+    result = DIDCheqdRegistry._get_resource_name(long_name)
+    assert result != long_name  # Should be different (hashed)
+    assert len(result) == 64  # SHA-256 hex digest is always 64 chars
+
+    # Very long name - should still result in 64 char hash
+    very_long_name = "test_" * 100  # 500 characters
+    result = DIDCheqdRegistry._get_resource_name(very_long_name)
+    assert result != very_long_name
+    assert len(result) == 64
+
+    # Same long input should produce same hash (deterministic)
+    result2 = DIDCheqdRegistry._get_resource_name(very_long_name)
+    assert result2 == result

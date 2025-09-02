@@ -1,21 +1,37 @@
 """DID Cheqd routes."""
 
+import logging
 from http import HTTPStatus
 
 from acapy_agent.admin.decorators.auth import tenant_authentication
 from acapy_agent.admin.request_context import AdminRequestContext
+from acapy_agent.ledger.base import EndpointType
 from acapy_agent.messaging.models.openapi import OpenAPISchema
+from acapy_agent.protocols.coordinate_mediation.v1_0.route_manager import RouteManager
 from acapy_agent.wallet.error import WalletError
+from acapy_agent.wallet.routes import (
+    DIDEndpointWithTypeSchema,
+    DIDSchema,
+    WalletModuleResponseSchema,
+)
 from aiohttp import web
 from aiohttp_apispec import docs, request_schema, response_schema
 from marshmallow import Schema, fields
 
 from .did.manager import CheqdDIDManager, CheqdDIDManagerError
-from .validation import (
-    CHEQD_DID_EXAMPLE,
-    CHEQD_DID_VALIDATE,
-    CHEQD_DIDSTATE_EXAMPLE,
-)
+from .validation import CHEQD_DID_EXAMPLE, CHEQD_DID_VALIDATE, CHEQD_DIDSTATE_EXAMPLE
+
+LOGGER = logging.getLogger(__name__)
+
+
+class CustomDIDEndpointWithTypeSchema(DIDEndpointWithTypeSchema):
+    """Schema for setting Cheqd DID endpoint with type."""
+
+    did = fields.Str(
+        required=True,
+        validate=CHEQD_DID_VALIDATE,
+        metadata={"description": "DID of interest", "example": CHEQD_DID_EXAMPLE},
+    )
 
 
 class VerificationMethodSchema(Schema):
@@ -37,7 +53,10 @@ class VerificationMethodSchema(Schema):
     )
     publicKeyMultibase = fields.Str(
         required=False,
-        metadata={"description": "Public Key in multibase format", "example": "z6Mk..."},
+        metadata={
+            "description": "Public Key in multibase format",
+            "example": "z6Mk...",
+        },
     )
     publicKeyBase58 = fields.Str(
         required=False,
@@ -70,10 +89,30 @@ class ServiceSchema(Schema):
         required=True,
         metadata={"description": "Service Type", "example": "MessagingService"},
     )
-    serviceEndpoint = fields.List(
-        fields.Str(metadata={"description": "Service endpoint URL"}),
+    serviceEndpoint = fields.Str(
+        required=True, metadata={"description": "Service endpoint URL"}
+    )
+    recipientKeys = fields.List(
+        fields.Str(metadata={"description": "Did key reference"}),
         required=True,
-        metadata={"description": "Array of Service endpoints"},
+        metadata={
+            "description": "Array of did key references to denote the default recipients"
+        },
+    )
+    priority = fields.Integer(
+        required=False, metadata={"description": "Priority of the service endpoint"}
+    )
+    routingKeys = fields.List(
+        fields.Str(metadata={"description": "Did key reference"}),
+        required=False,
+        metadata={
+            "description": "Array of did key references to denote individual routing hops"
+        },
+    )
+    accept = fields.List(
+        fields.Str(metadata={"description": "Media types"}),
+        required=False,
+        metadata={"description": "Array of supported media types"},
     )
 
 
@@ -270,6 +309,41 @@ class UpdateCheqdDIDResponseSchema(OpenAPISchema):
     )
 
 
+class DIDImportSchema(OpenAPISchema):
+    """Request schema for importing a DID."""
+
+    did_document = fields.Raw(
+        required=True,
+        metadata={
+            "description": "The DID document to import",
+            "example": {
+                "id": "did:example:123456789",
+                "verificationMethod": [
+                    {
+                        "id": "did:example:123456789#key-1",
+                        "type": "Ed25519VerificationKey2018",
+                        "controller": "did:example:123456789",
+                        "publicKeyBase58": "H3C2AVvLMv6gmMNam3uVAjZpfkcJCwDwnZn6z3wXmqPV",
+                    }
+                ],
+            },
+        },
+    )
+
+    metadata = fields.Dict(
+        required=False,
+        metadata={
+            "description": "Additional metadata to associate with the imported DID"
+        },
+    )
+
+
+class DIDImportResponseSchema(OpenAPISchema):
+    """Response schema for DID import."""
+
+    result = fields.Nested(DIDSchema())
+
+
 @docs(tags=["did"], summary="Create a did:cheqd")
 @request_schema(CreateCheqdDIDRequestSchema())
 @response_schema(CreateCheqdDIDResponseSchema, HTTPStatus.OK)
@@ -277,6 +351,7 @@ class UpdateCheqdDIDResponseSchema(OpenAPISchema):
 async def create_cheqd_did(request: web.BaseRequest):
     """Create a Cheqd DID."""
     context: AdminRequestContext = request["context"]
+    profile = context.profile
     config = context.settings.get("plugin_config")
     resolver_url = None
     registrar_url = None
@@ -285,19 +360,27 @@ async def create_cheqd_did(request: web.BaseRequest):
         resolver_url = config.get("resolver_url")
     try:
         body = await request.json()
-    except Exception:
+    except Exception as err:
+        LOGGER.error("Error parsing request body: %s", str(err))
         body = {}
 
     try:
-        result = await CheqdDIDManager(
-            context.profile, registrar_url, resolver_url
-        ).create(body.get("didDocument"), body.get("options"))
-        return web.json_response(
-            {"did": result.get("did"), "verkey": result.get("verkey")}
+        result = await CheqdDIDManager(profile, registrar_url, resolver_url).create(
+            body.get("didDocument"), body.get("options")
         )
+        did = result.get("did")
+        verkey = result.get("verkey")
+
+        route_manager = profile.inject(RouteManager)
+        await route_manager.route_verkey(profile, verkey)
+
+        LOGGER.info(f"Created DID: {did} with verkey: {verkey}")
+        return web.json_response({"did": did, "verkey": verkey})
     except CheqdDIDManagerError as err:
+        LOGGER.error("Error creating Cheqd DID: %s", err.roll_up)
         raise web.HTTPInternalServerError(reason=err.roll_up)
     except WalletError as err:
+        LOGGER.error("Error creating Cheqd DID: %s", err.roll_up)
         raise web.HTTPBadRequest(reason=err.roll_up)
 
 
@@ -316,7 +399,8 @@ async def update_cheqd_did(request: web.BaseRequest):
         resolver_url = config.get("resolver_url")
     try:
         body = await request.json()
-    except Exception:
+    except Exception as err:
+        LOGGER.error("Error parsing request body: %s", str(err))
         body = {}
 
     try:
@@ -329,8 +413,10 @@ async def update_cheqd_did(request: web.BaseRequest):
         )
         return web.json_response(result)
     except CheqdDIDManagerError as err:
+        LOGGER.error("Error updating Cheqd DID: %s", err.roll_up)
         raise web.HTTPInternalServerError(reason=err.roll_up)
     except WalletError as err:
+        LOGGER.error("Wallet error updating Cheqd DID: %s", err.roll_up)
         raise web.HTTPBadRequest(reason=err.roll_up)
 
 
@@ -349,7 +435,8 @@ async def deactivate_cheqd_did(request: web.BaseRequest):
         resolver_url = config.get("resolver_url")
     try:
         body = await request.json()
-    except Exception:
+    except Exception as err:
+        LOGGER.error("Error parsing request body: %s", str(err))
         body = {}
 
     try:
@@ -358,9 +445,96 @@ async def deactivate_cheqd_did(request: web.BaseRequest):
         ).deactivate(body.get("did"))
         return web.json_response(result)
     except CheqdDIDManagerError as err:
+        LOGGER.error("Error deactivating Cheqd DID: %s", err.roll_up)
+        raise web.HTTPInternalServerError(reason=err.roll_up)
+    except WalletError as err:
+        LOGGER.error("Wallet error deactivating Cheqd DID: %s", err.roll_up)
+        raise web.HTTPBadRequest(reason=err.roll_up)
+
+
+@docs(
+    tags=["wallet"], summary="Update the endpoint in the wallet and on ledger if posted"
+)
+@request_schema(CustomDIDEndpointWithTypeSchema)
+@response_schema(WalletModuleResponseSchema, 200, description="")
+@tenant_authentication
+async def cheqd_wallet_set_did_endpoint(request: web.BaseRequest):
+    """Set the endpoint for a did:cheqd DID."""
+    context: AdminRequestContext = request["context"]
+    config = context.settings.get("plugin_config")
+    resolver_url = None
+    registrar_url = None
+    if config:
+        registrar_url = config.get("registrar_url")
+        resolver_url = config.get("resolver_url")
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+
+    try:
+        did = body.get("did")
+        endpoint = body.get("endpoint")
+        endpoint_type = EndpointType.get(
+            body.get("endpoint_type", EndpointType.ENDPOINT.w3c)
+        )
+
+        # Use the DIDManager to update the DID with the new endpoint
+        cheqd_manager = CheqdDIDManager(context.profile, registrar_url, resolver_url)
+        result = await cheqd_manager.set_did_endpoint(
+            did,
+            endpoint,
+            endpoint_type,
+        )
+
+        return web.json_response({"result": result})
+
+    except Exception as err:
+        raise web.HTTPBadRequest(reason=str(err))
+
+
+@docs(
+    tags=["did"],
+    summary="Import an existing DID into the wallet",
+)
+@request_schema(DIDImportSchema)
+@response_schema(DIDImportResponseSchema(), description="")
+@tenant_authentication
+async def import_did(request: web.BaseRequest):
+    """Request handler for importing a DID into the wallet.
+
+    Args:
+        request: aiohttp request object
+
+    Returns:
+        The imported DID information
+
+    """
+    context: AdminRequestContext = request["context"]
+    config = context.settings.get("plugin_config")
+    resolver_url = None
+    registrar_url = None
+    if config:
+        registrar_url = config.get("registrar_url")
+        resolver_url = config.get("resolver_url")
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+
+    try:
+        result = await CheqdDIDManager(
+            context.profile, registrar_url, resolver_url
+        ).import_did(
+            body.get("did_document"),
+            body.get("metadata"),
+        )
+    except CheqdDIDManagerError as err:
         raise web.HTTPInternalServerError(reason=err.roll_up)
     except WalletError as err:
         raise web.HTTPBadRequest(reason=err.roll_up)
+
+    return web.json_response(result)
 
 
 async def register(app: web.Application):
@@ -370,6 +544,9 @@ async def register(app: web.Application):
             web.post("/did/cheqd/create", create_cheqd_did),
             web.post("/did/cheqd/update", update_cheqd_did),
             web.post("/did/cheqd/deactivate", deactivate_cheqd_did),
+            web.post("/did/import", import_did),
+            # Add a cheqd specific set-did-endpoint route with our custom handler
+            web.post("/wallet/cheqd/set-did-endpoint", cheqd_wallet_set_did_endpoint),
         ]
     )
 

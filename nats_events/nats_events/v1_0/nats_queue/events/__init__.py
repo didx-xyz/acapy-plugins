@@ -10,6 +10,7 @@ from string import Template
 from typing import Any, Optional
 
 import orjson
+from acapy_agent.anoncreds.event_storage import serialize_event_payload
 from acapy_agent.config.injection_context import InjectionContext
 from acapy_agent.connections.models.connection_target import ConnectionTarget
 from acapy_agent.core.event_bus import Event, EventBus, EventWithMetadata
@@ -49,6 +50,8 @@ async def setup(context: InjectionContext):
 
 RECORD_RE = re.compile(r"acapy::record::([^:]*)(?:::(.*))?")
 WEBHOOK_RE = re.compile(r"acapy::webhook::{.*}")
+MESSAGE_RE = re.compile(r"acapy::basicmessage::.*")
+ANONCREDS_RE = re.compile(r"anoncreds::([^:]*)::([^:]*)$")
 
 
 async def nats_jetstream_setup(profile: Profile, event: Event) -> JetStreamContext:
@@ -129,9 +132,7 @@ async def on_startup(profile: Profile, event: Event, retries: int = 5, delay: in
             is_working = account_info.streams > 0
             LOGGER.info("JetStream account info: %s", account_info)
             if is_working:
-                LOGGER.info(
-                    "JetStream is working with %d streams", account_info.streams
-                )
+                LOGGER.info("JetStream is working with %d streams", account_info.streams)
                 break
             else:
                 LOGGER.warning("JetStream is not working properly, no streams found")
@@ -180,6 +181,8 @@ def _derive_category(topic: str):
         return match.group(1)
     if WEBHOOK_RE.match(topic):
         return "webhook"
+    if MESSAGE_RE.match(topic):
+        return "basicmessage"
 
 
 def process_event_payload(event_payload: Any):
@@ -269,14 +272,13 @@ async def handle_event(profile: Profile, event: EventWithMetadata):
         return  # Skip OutboundMessage types for now
         # event_payload_to_process = process_outbound_message_payload(event.payload)
     else:
-        event_payload_to_process = event.payload
+        event_payload_to_process = serialize_event_payload(event.payload)
 
     js = profile.inject_or(JetStreamContext)
     if not js:
         LOGGER.warning("JetStream context not available. Setting up JetStream again")
         js = await nats_jetstream_setup(profile, event)
 
-    LOGGER.debug("Handling event: %s", event)
     wallet_id: Optional[str] = profile.settings.get("wallet.id")
     try:
         event_payload = process_event_payload(event_payload_to_process)
@@ -293,13 +295,32 @@ async def handle_event(profile: Profile, event: EventWithMetadata):
                 event_payload = process_event_payload(
                     event_payload_to_process.enc_payload
                 )
-    payload = {
-        "wallet_id": wallet_id or "base",
-        "state": event_payload.get("state"),
-        "topic": event.topic,
-        "category": _derive_category(event.topic),
-        "payload": event_payload,
-    }
+
+    if event.topic.startswith("anoncreds::"):
+        anon_match = ANONCREDS_RE.match(event.topic)
+        if anon_match:
+            event_payload["state"] = anon_match.group(2)
+            payload = {
+                "wallet_id": wallet_id or "base",
+                "state": anon_match.group(2),
+                "topic": event.topic,
+                "category": anon_match.group(1),
+                "payload": event_payload,
+            }
+        else:
+            LOGGER.warning(
+                "Could not derive anoncreds category from topic: %s", event.topic
+            )
+
+    else:
+        payload = {
+            "wallet_id": wallet_id or "base",
+            "state": event_payload.get("state"),
+            "topic": event.topic,
+            "category": _derive_category(event.topic),
+            "payload": event_payload,
+        }
+
     try:
         nats_subject = Template(template).substitute(**payload)
 

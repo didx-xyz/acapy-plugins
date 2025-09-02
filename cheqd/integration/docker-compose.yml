@@ -12,6 +12,27 @@ services:
         condition: service_healthy
       holder:
         condition: service_healthy
+      valkey:
+        condition: service_healthy
+
+  valkey:
+    image: valkey/valkey:8-alpine
+    container_name: valkey-primary
+    ports:
+      - "6379:6379"
+    command: >
+      valkey-server
+      --save ""
+      --appendonly no
+      --protected-mode no
+      --bind 0.0.0.0
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
 
   issuer:
     build:
@@ -32,10 +53,13 @@ services:
       --wallet-type askar-anoncreds
       --wallet-name agency
       --wallet-key insecure
+      --wallet-allow-insecure-seed
       --auto-provision
-      --log-level info
+      --log-level debug
       --debug-webhooks
       --no-ledger
+      --public-invites
+      --requests-through-public-did
       --plugin cheqd
       --plugin-config plugin-config-integration.yml
     healthcheck:
@@ -48,7 +72,7 @@ services:
       - did_registrar
       - did_resolver
       - tails
-      
+
   holder:
     build:
       context: ../
@@ -68,9 +92,10 @@ services:
         --wallet-name holder
         --wallet-key insecure
         --auto-provision
-        --log-level info
+        --log-level debug
         --debug-webhooks
         --no-ledger
+        --public-invites
         --plugin cheqd
         --plugin-config plugin-config-integration.yml
     healthcheck:
@@ -84,11 +109,14 @@ services:
       - did_resolver
 
   did_registrar:
-    image: universalregistrar/uni-registrar-web@sha256:d02207a156cb97dd79d3515bc90a963d12660c4ca82382f77ae6b5d32351267f
+    image: universalregistrar/uni-registrar-web:latest
     ports:
       - "9080:9080"
     depends_on:
       - driver-did-cheqd
+    environment:
+      LOGGING_LEVEL_ROOT: "WARN"
+      LOGGING_LEVEL_uniregistrar: "WARN"
 
   driver-did-cheqd:
     image: ghcr.io/cheqd/did-registrar:production-latest
@@ -96,6 +124,7 @@ services:
       - "9089:3000"
     restart: on-failure
     environment:
+      - NPM_CONFIG_LOGLEVEL=warn
       - FEE_PAYER_TESTNET_MNEMONIC=${FEE_PAYER_TESTNET_MNEMONIC}
       - FEE_PAYER_MAINNET_MNEMONIC=${FEE_PAYER_MAINNET_MNEMONIC}
 
@@ -130,4 +159,4 @@ services:
       --host 0.0.0.0
       --port 6543
       --storage-path /tmp/tails-files
-      --log-level info
+      --log-level INFO

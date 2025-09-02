@@ -4,6 +4,7 @@ import enum
 from collections import Counter
 
 from acapy_agent.messaging.models.openapi import OpenAPISchema
+from acapy_agent.vc.vc_ld.models.presentation import PresentationSchema
 from marshmallow import fields, validates, validate, ValidationError
 
 
@@ -16,6 +17,14 @@ class ConfigureWebvhSchema(OpenAPISchema):
             "description": "URL of the webvh server",
             "example": "http://localhost:8000",
         },
+    )
+    notify_watchers = fields.Boolean(
+        required=False,
+        metadata={
+            "description": "Notify watchers on DID updates",
+            "example": "false",
+        },
+        default=False,
     )
     witness = fields.Boolean(
         required=False,
@@ -37,6 +46,14 @@ class ConfigureWebvhSchema(OpenAPISchema):
         metadata={
             "description": "Auto sign witness requests",
             "example": "false",
+        },
+        default=False,
+    )
+    endorsement = fields.Bool(
+        required=False,
+        metadata={
+            "description": "Require witness approval for creating attested resources.",
+            "example": False,
         },
         default=False,
     )
@@ -70,34 +87,36 @@ class WebvhCreateWitnessInvitationSchema(OpenAPISchema):
         default=None,
     )
 
+    multi = fields.Bool(
+        required=False,
+        metadata={
+            "description": "Create a multi use witness invitation.",
+            "example": True,
+        },
+        default=False,
+    )
+
 
 class WebvhUpdateSchema(OpenAPISchema):
     """Request model for updating a Webvh DID."""
 
-    class UpdateOptionsSchema(OpenAPISchema):
-        """Options for a Webvh DID update request."""
+    # class UpdateStateSchema(OpenAPISchema):
+    #     "Webvh DID state update schema."""
 
-        addKeys = fields.List(
-            fields.Str(),
+    class UpdateParametersSchema(OpenAPISchema):
+        """Webvh DID parameters update schema."""
+
+        portable = fields.Bool(
             required=False,
-            metadata={"description": "Optional key id's to add to did document."},
-        )
-        removeKeys = fields.List(
-            fields.Str(),
-            required=False,
-            metadata={"description": "Optional key id's to remove from did document."},
+            metadata={
+                "description": "Portable flag",
+                "example": False,
+            },
         )
         prerotation = fields.Bool(
             required=False,
             metadata={
                 "description": "Prerotation flag",
-                "example": False,
-            },
-        )
-        portable = fields.Bool(
-            required=False,
-            metadata={
-                "description": "Portable flag",
                 "example": False,
             },
         )
@@ -109,13 +128,8 @@ class WebvhUpdateSchema(OpenAPISchema):
             },
         )
 
-    id = fields.Str(
-        required=True,
-        metadata={
-            "description": "The DID to update",
-        },
-    )
-    options = fields.Nested(UpdateOptionsSchema())
+    # state = fields.Nested(UpdateStateSchema())
+    parameters = fields.Nested(UpdateParametersSchema())
 
 
 class WebvhCreateSchema(OpenAPISchema):
@@ -124,43 +138,75 @@ class WebvhCreateSchema(OpenAPISchema):
     class CreateOptionsSchema(OpenAPISchema):
         """Options for a Webvh DID request."""
 
-        prerotation = fields.Bool(
+        server_url = fields.Str(
             required=False,
             metadata={
-                "description": "Prerotation flag",
-                "example": False,
+                "description": "Optional DID WebVH server url.",
+                "example": "https://id.test-suite.app",
             },
-            default=False,
-        )
-        portable = fields.Bool(
-            required=False,
-            metadata={
-                "description": "Portable flag",
-                "example": False,
-            },
-            default=False,
-        )
-        witnessTreshold = fields.Int(
-            required=False,
-            metadata={
-                "description": "The witness treshold",
-                "example": 1,
-            },
+            default=None,
         )
         namespace = fields.Str(
-            required=True,
+            required=False,
             metadata={
                 "description": "Namespace for the DID",
-                "example": "prod",
+                "example": "default",
             },
+            default="default",
         )
         identifier = fields.Str(
             required=False,
             metadata={
-                "description": "Identifier for the DID. Must be unique within the "
-                "namespace. If not provided, a random one will be generated.",
+                "description": "Identifier for the DID.",
                 "example": "1",
             },
+        )
+        version_time = fields.Str(
+            required=False,
+            metadata={
+                "description": "Optional timestamp for the initial versionTime.",
+                "example": "2025-07-28T21:47:32Z",
+            },
+            default=None,
+        )
+        watchers = fields.List(
+            fields.Str(),
+            required=False,
+            metadata={
+                "description": "List of watchers for this DID.",
+                "example": ["https://watcher.webvh.test-suite.app"],
+            },
+        )
+        portable = fields.Bool(
+            required=False,
+            metadata={
+                "description": "Enable DID portability.",
+                "example": False,
+            },
+            default=False,
+        )
+        prerotation = fields.Bool(
+            required=False,
+            metadata={
+                "description": "Enable key pre-rotation on DID updates.",
+                "example": False,
+            },
+            default=False,
+        )
+        witness_threshold = fields.Int(
+            required=False,
+            metadata={
+                "description": "The witness treshold.",
+                "example": 1,
+            },
+        )
+        apply_policy = fields.Bool(
+            required=False,
+            metadata={
+                "description": "Apply policies from server.",
+                "example": True,
+            },
+            default=True,
         )
 
     options = fields.Nested(CreateOptionsSchema())
@@ -257,3 +303,9 @@ class IdRequestParamSchema(OpenAPISchema):
             "example": "did:web:server.localhost%3A8000:prod:1",
         },
     )
+
+
+class WebvhUpdateWhoisSchema(OpenAPISchema):
+    """Request model for updating a whois VP."""
+
+    presentation = fields.Nested(PresentationSchema, required=True)

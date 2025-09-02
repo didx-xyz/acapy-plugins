@@ -1,7 +1,8 @@
 """DID Manager Base Classes."""
 
+import logging
 from abc import ABC, abstractmethod
-from typing import List, Optional, Union, Literal, Dict
+from typing import Dict, List, Literal, Optional, Union
 
 from acapy_agent.core.error import BaseError
 from acapy_agent.core.profile import Profile
@@ -9,6 +10,8 @@ from acapy_agent.wallet.base import BaseWallet
 from acapy_agent.wallet.util import b64_to_bytes, bytes_to_b64
 from aiohttp import web
 from pydantic import BaseModel, Field
+
+LOGGER = logging.getLogger(__name__)
 
 
 class DynamicSchema(BaseModel):
@@ -37,6 +40,10 @@ class ServiceSchema(BaseModel):
     id: str
     type: str
     serviceEndpoint: Union[str, List[str]]
+    recipientKeys: List[str]
+    priority: Optional[int] = 0
+    routingKeys: Optional[List[str]] = []
+    accept: Optional[List[str]] = []
 
 
 class DIDDocumentSchema(DynamicSchema):
@@ -72,7 +79,7 @@ class SigningRequest(DynamicSchema):
     kid: str
     type: Optional[str] = None
     alg: Optional[str] = None
-    serializedPayload: str
+    serializedPayload: str = Field(..., repr=False)
 
 
 class Secret(DynamicSchema):
@@ -144,6 +151,7 @@ class ResourceCreateRequestOptions(BaseModel):
     content: str = Field(
         None,
         description="This input field contains Base64-encoded data.",
+        repr=False,
     )
     options: Optional[Options] = None
 
@@ -163,6 +171,7 @@ class ResourceUpdateRequestOptions(BaseModel):
     content: List[str] = Field(
         None,
         description="This input field contains Base64-encoded data.",
+        repr=False,
     )
     options: Optional[Options] = None
 
@@ -239,7 +248,7 @@ class DidUrlErrorState(DynamicSchema):
 class ResourceResponse(DynamicSchema):
     """Resource Create Response."""
 
-    jobId: str
+    jobId: str = ""
     didUrlState: Union[DidUrlSuccessState, DidUrlActionState, DidUrlErrorState]
     didRegistrationMetadata: dict = {}
     contentMetadata: dict = {}
@@ -248,7 +257,7 @@ class ResourceResponse(DynamicSchema):
 class UpdateResourceResponse(BaseModel):
     """Resource Update Response."""
 
-    jobId: str
+    jobId: str = ""
     didUrlState: Union[DidUrlSuccessState, DidUrlActionState, DidUrlErrorState]
     didRegistrationMetadata: dict = {}
     contentMetadata: dict = {}
@@ -337,6 +346,7 @@ class BaseDIDManager(ABC):
         Returns:
             List of signed responses, each containing 'kid' and 'signature'.
         """
+        LOGGER.debug("Signing requests %s", signing_requests)
         signed_responses = {}
         for sign_req_id, sign_req in signing_requests.items():
             kid = sign_req.kid

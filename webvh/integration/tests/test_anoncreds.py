@@ -22,14 +22,19 @@ from .constants import (
 async def create_did(agent):
     await agent.post(
         "/did/webvh/configuration",
-        json={"server_url": SERVER_URL, "witness_key": WITNESS_KEY, "witness": True},
+        json={
+            "server_url": SERVER_URL,
+            "witness_key": WITNESS_KEY,
+            "witness": True,
+            "auto_attest": True,
+        },
     )
     identifier = str(uuid.uuid4())
     response = await agent.post(
-        "/did/webvh/controller/create",
+        "/did/webvh/create",
         json={"options": {"namespace": TEST_NAMESPACE, "identifier": identifier}},
     )
-    return response["id"]
+    return response["state"]["id"]
 
 
 @pytest.mark.asyncio
