@@ -306,7 +306,9 @@ class CheqdDIDManager(BaseDIDManager):
                         LOGGER.info("Updating routing for verkey: %s", verkey)
                         try:
                             # Update the DID's verkey with automatic KID reassignment
-                            updated_did_info = await wallet.update_local_did_verkey(did, verkey)
+                            updated_did_info = await wallet.update_local_did_verkey(
+                                did, verkey
+                            )
                             LOGGER.debug("Updated DID info: %s", updated_did_info)
 
                             # Update public DID if this is the current public DID
@@ -321,9 +323,7 @@ class CheqdDIDManager(BaseDIDManager):
                             LOGGER.error("Failed to update verkey in wallet: %s", e)
 
                     else:
-                        LOGGER.error(
-                            "No verkey found for verification method: %s", vm
-                        )
+                        LOGGER.error("No verkey found for verification method: %s", vm)
 
             except Exception as ex:
                 LOGGER.error("Exception occurred during DID update: %s", str(ex))

@@ -184,6 +184,7 @@ def _derive_category(topic: str):
     if MESSAGE_RE.match(topic):
         return "basicmessage"
 
+
 def process_event_payload(event_payload: Any):
     """Process event payload."""
     processed_event_payload = None
@@ -307,7 +308,9 @@ async def handle_event(profile: Profile, event: EventWithMetadata):
                 "payload": event_payload,
             }
         else:
-            LOGGER.warning("Could not derive anoncreds category from topic: %s", event.topic)
+            LOGGER.warning(
+                "Could not derive anoncreds category from topic: %s", event.topic
+            )
 
     else:
         payload = {

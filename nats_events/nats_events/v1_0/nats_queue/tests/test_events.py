@@ -149,8 +149,8 @@ class TestNATSEvents(IsolatedAsyncioTestCase):
                 enc_payload="",
                 endpoint="",
                 payload="""
-                    {"@type": "did:sov:BzCbsNYhMrjHiqZDTUASHg;spec/basicmessage/1.0/message", "@id": 
-                    "99bf771c-93e4-4482-8ab9-45080927f67c", "content": "test", "sent_time": 
+                    {"@type": "did:sov:BzCbsNYhMrjHiqZDTUASHg;spec/basicmessage/1.0/message", "@id":
+                    "99bf771c-93e4-4482-8ab9-45080927f67c", "content": "test", "sent_time":
                     "2022-09-01T20:15:23.719131Z"}
                 """,
                 reply_session_id="",
@@ -180,8 +180,8 @@ class TestNATSEvents(IsolatedAsyncioTestCase):
             payload=OutboundMessage(
                 connection_id="503a4f71-89f1-4bb2-b20d-e74c685ba325",
                 enc_payload="""
-                    {"@type": "did:sov:BzCbsNYhMrjHiqZDTUASHg;spec/basicmessage/1.0/message", "@id": 
-                    "99bf771c-93e4-4482-8ab9-45080927f67c", "content": "test", "sent_time": 
+                    {"@type": "did:sov:BzCbsNYhMrjHiqZDTUASHg;spec/basicmessage/1.0/message", "@id":
+                    "99bf771c-93e4-4482-8ab9-45080927f67c", "content": "test", "sent_time":
                     "2022-09-01T20:15:23.719131Z"}
                 """.encode("utf-8"),
                 endpoint="",
