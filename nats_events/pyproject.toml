@@ -9,7 +9,8 @@ python = "^3.12"
 
 # Define ACA-Py as an optional/extra dependency so it can be
 # explicitly installed with the plugin if desired.
-acapy-agent-didx = { version = ">=1.3.2rc0.post20250822", source = "testpypi", optional = true }
+# acapy-agent-didx = { version = ">=1.3.2rc0.post20250822", source = "testpypi", optional = true }
+acapy-agent-didx = { git = "https://github.com/didx-xyz/acapy", branch = "1.4.0-20251118-rebase-changes", optional = true }
 aiohttp = "^3.9.10"
 pydantic = "^2.7"
 uvicorn = "^0.34.0"
@@ -39,7 +40,7 @@ indy-credx = { version = "~1.1.1" }
 indy-vdr = { version = "~0.4.1" }
 ursa-bbs-signatures = { version = "~1.0.1" }
 python3-indy = { version = "^1.11.1" }
-anoncreds = { version = "0.2.0" }
+anoncreds = { version = "^0.2.0" }
 
 [tool.ruff]
 line-length = 90
