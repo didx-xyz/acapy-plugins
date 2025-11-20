@@ -10,7 +10,9 @@ from string import Template
 from typing import Any, Optional
 
 import orjson
-from acapy_agent.anoncreds.event_storage import serialize_event_payload
+from acapy_agent.anoncreds.revocation.auto_recovery.event_storage import (
+    serialize_event_payload,
+)
 from acapy_agent.config.injection_context import InjectionContext
 from acapy_agent.connections.models.connection_target import ConnectionTarget
 from acapy_agent.core.event_bus import Event, EventBus, EventWithMetadata

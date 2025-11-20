@@ -14,7 +14,7 @@ from acapy_agent.wallet.did_info import DIDInfo
 from acapy_agent.wallet.did_method import DIDMethods
 from acapy_agent.wallet.did_parameters_validation import DIDParametersValidation
 from acapy_agent.wallet.error import WalletError
-from acapy_agent.wallet.key_type import BLS12381G2, ED25519, KeyType, P256
+from acapy_agent.wallet.key_type import BLS12381G2, ED25519, P256, KeyType
 from acapy_agent.wallet.keys.manager import multikey_to_verkey
 from acapy_agent.wallet.routes import format_did_info
 from acapy_agent.wallet.util import b58_to_bytes, bytes_to_b64
