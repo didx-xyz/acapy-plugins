@@ -19,18 +19,18 @@ jobs:
       #       Check out repo
       #----------------------------------------------
       - name: Check out repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
       #----------------------------------------------
       #       Get docker compose
       #----------------------------------------------
       - name: Initialize Docker Compose
-        uses: isbang/compose-action@v1.5.1
+        uses: isbang/compose-action@v2.4.2
       #----------------------------------------------
       #       Get changed files
       #----------------------------------------------
       - name: Get changed files
         id: changed-files
-        uses: tj-actions/changed-files@v47.0.0
+        uses: tj-actions/changed-files@v47.0.1
       #----------------------------------------------
       #       Get changed plugins
       #----------------------------------------------
